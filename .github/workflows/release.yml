@@ -42,7 +42,7 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      # System dependencies needed on Linux to build Wails
+      # Dipendenze di sistema necessarie su Linux per compilare Wails
       - name: Install Linux dependencies
         if: matrix.build.os == 'ubuntu-latest'
         run: |
@@ -52,7 +52,7 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm install
 
-      - name: Prepare build assets (macOS)
+      - name: Prepare build assets
         run: mkdir -p build && cp assets/icons/appicon.png build/appicon.png
 
       - name: Build (Linux)
@@ -86,5 +86,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*
+            assets/icons/appicon.png
+            install.sh
           generate_release_notes: true
