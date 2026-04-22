@@ -1,6 +1,6 @@
 # Connection Manager
 
-A desktop app to manage and connect to SSH hosts.
+Connection Manager keeps all SSH connections organized in one place. Browse them in tree or table view, filter by any field in real time, import and export via CSV, and connect instantly opening a native terminal.
 
 ---
 
