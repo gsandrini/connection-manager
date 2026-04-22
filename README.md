@@ -25,6 +25,31 @@ A desktop app to manage and connect to SSH hosts.
 - Opens a native terminal on connect
 
 ---
+## Install
+
+```bash
+curl -fsSL https://github.com/gsandrini/connection-manager/releases/latest/download/install.sh | bash
+```
+
+The script will install:
+
+|               | Path                                                     |
+|---------------|----------------------------------------------------------|
+| Executable    | `~/bin/connection-manager`                               |
+| Icon          | `~/.local/share/icons/connection-manager.png`            |
+| Desktop entry | `~/.local/share/applications/connection-manager.desktop` |
+
+### Note
+
+Make sure `~/bin` is in your `PATH`.
+
+If not, add this to your shell configuration file (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+export PATH="$HOME/bin:$PATH"
+```
+
+---
 
 ## Tech stack
 
