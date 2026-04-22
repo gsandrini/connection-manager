@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connection Manager</title>
+  <link rel="stylesheet" href="assets/css/tailwind.min.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <script defer src="assets/js/alpine.min.js"></script>
+</head>
+<body x-data="ConnectionManagerApp()" x-cloak class="font-mono text-[13px] min-h-screen">
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <!-- Header -->
+  <div class="mb-6">
+    <div class="flex items-center justify-between mb-1">
+      <span class="text-lg font-medium tracking-tight" x-text="t.title"></span>
+      <button @click="toggleLang()" class="btn-secondary text-[11px] px-2.5 py-1 rounded-md"
+              x-text="lang === 'it' ? 'EN' : 'IT'"></button>
+    </div>
+  </div>
+  <!-- Toolbar -->
+  <div class="flex items-center gap-2 mb-3 flex-wrap">
+    <input type="text" x-model="searchText" :placeholder="t.search" class="field-input flex-1 min-w-40"/>
+    <button @click="view = 'tree'" :class="view === 'tree' ? 'btn-primary' : 'btn-secondary'"
+            class="gap-1.5 text-[11px] px-3">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <path d="M3 3h4v4H3zM3 10h4v4H3zM3 17h4v4H3zM10 4h11M10 12h11M10 20h11"/>
+      </svg>
+      <span x-text="t.treeView"></span>
+    </button>
+    <button @click="view = 'table'" :class="view === 'table' ? 'btn-primary' : 'btn-secondary'"
+            class="gap-1.5 text-[11px] px-3">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <line x1="3" y1="9" x2="21" y2="9"/>
+        <line x1="3" y1="15" x2="21" y2="15"/>
+        <line x1="9" y1="9" x2="9" y2="21"/>
+      </svg>
+      <span x-text="t.tableView"></span>
+    </button>
+    <template x-if="view === 'tree'">
+      <button @click="toggleAll()" class="btn-secondary gap-1.5 text-[11px] px-3"
+              :disabled="filteredConnections.length === 0"
+              :style="filteredConnections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+        <svg x-show="!allExpanded" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2">
+          <polyline points="15 3 21 3 21 9"/>
+          <polyline points="9 21 3 21 3 15"/>
+          <line x1="21" y1="3" x2="14" y2="10"/>
+          <line x1="3" y1="21" x2="10" y2="14"/>
+        </svg>
+        <svg x-show="allExpanded" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2">
+          <polyline points="4 14 10 14 10 20"/>
+          <polyline points="20 10 14 10 14 4"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+          <line x1="3" y1="21" x2="14" y2="10"/>
+        </svg>
+        <span x-text="allExpanded ? t.collapseAll : t.expandAll"></span>
+      </button>
+    </template>
+  </div>
+  <!-- Main card -->
+  <div class="card mb-3 overflow-hidden">
+    <!-- TREE VIEW -->
+    <div x-show="view === 'tree'" class="overflow-y-auto" style="max-height:420px">
+      <template x-if="connections.length === 0">
+        <div class="empty-state" x-text="t.noConnections"></div>
+      </template>
+      <template x-if="connections.length > 0 && filteredConnections.length === 0">
+        <div class="empty-state" x-text="t.noResults"></div>
+      </template>
+      <!-- Depth 0: root children -->
+      <template x-for="n0 in treeData.children" :key="n0.path">
+        <div class="tree-group">
+          <div class="tree-env-label" @click="toggleNode(n0.path)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" stroke-width="2.5"
+                 :style="isNodeExpanded(n0.path) ? '' : 'transform:rotate(-90deg)'"
+                 style="transition:transform 0.15s">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <span x-text="n0.name"></span>
+            <span style="opacity:0.5" x-text="'(' + countHosts(n0) + ')'"></span>
+          </div>
+          <div x-show="isNodeExpanded(n0.path)">
+            <!-- Hosts at depth 0 -->
+            <template x-for="conn in n0.hosts" :key="conn.name + conn.server">
+              <div class="conn-row pl-8" :class="{ selected: isSelected(conn) }"
+                   @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.45">
+                  <polyline points="4 17 10 11 4 5"/>
+                  <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+                <span class="flex-1 truncate font-medium" x-text="conn.name"></span>
+                <span class="text-[11px]" style="color:var(--color-muted)" x-text="conn.server"></span>
+                <template x-if="conn.labels">
+                  <div class="flex gap-1 flex-wrap ml-1">
+                    <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
+                      <span class="tag" x-text="tag"></span>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <!-- Depth 1 -->
+            <template x-for="n1 in n0.children" :key="n1.path">
+              <div>
+                <div class="tree-group-label" style="padding-left:1.5rem" @click="toggleNode(n1.path)">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="none" viewBox="0 0 24 24"
+                       stroke="currentColor" stroke-width="2.5"
+                       :style="isNodeExpanded(n1.path) ? '' : 'transform:rotate(-90deg)'"
+                       style="transition:transform 0.15s">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                  <span x-text="n1.name"></span>
+                  <span style="opacity:0.5" x-text="'(' + countHosts(n1) + ')'"></span>
+                </div>
+                <div x-show="isNodeExpanded(n1.path)">
+                  <!-- Hosts at depth 1 -->
+                  <template x-for="conn in n1.hosts" :key="conn.name + conn.server">
+                    <div class="conn-row" style="padding-left:3rem" :class="{ selected: isSelected(conn) }"
+                         @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+                           stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.45">
+                        <polyline points="4 17 10 11 4 5"/>
+                        <line x1="12" y1="19" x2="20" y2="19"/>
+                      </svg>
+                      <span class="flex-1 truncate font-medium" x-text="conn.name"></span>
+                      <span class="text-[11px]" style="color:var(--color-muted)" x-text="conn.server"></span>
+                      <template x-if="conn.labels">
+                        <div class="flex gap-1 flex-wrap ml-1">
+                          <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
+                            <span class="tag" x-text="tag"></span>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                  <!-- Depth 2 -->
+                  <template x-for="n2 in n1.children" :key="n2.path">
+                    <div>
+                      <div class="tree-group-label" style="padding-left:2.75rem" @click="toggleNode(n2.path)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="none" viewBox="0 0 24 24"
+                             stroke="currentColor" stroke-width="2.5"
+                             :style="isNodeExpanded(n2.path) ? '' : 'transform:rotate(-90deg)'"
+                             style="transition:transform 0.15s">
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                        <span x-text="n2.name"></span>
+                        <span style="opacity:0.5" x-text="'(' + countHosts(n2) + ')'"></span>
+                      </div>
+                      <div x-show="isNodeExpanded(n2.path)">
+                        <!-- Hosts at depth 2 -->
+                        <template x-for="conn in n2.hosts" :key="conn.name + conn.server">
+                          <div class="conn-row" style="padding-left:4.5rem" :class="{ selected: isSelected(conn) }"
+                               @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.45">
+                              <polyline points="4 17 10 11 4 5"/>
+                              <line x1="12" y1="19" x2="20" y2="19"/>
+                            </svg>
+                            <span class="flex-1 truncate font-medium" x-text="conn.name"></span>
+                            <span class="text-[11px]" style="color:var(--color-muted)" x-text="conn.server"></span>
+                            <template x-if="conn.labels">
+                              <div class="flex gap-1 flex-wrap ml-1">
+                                <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
+                                  <span class="tag" x-text="tag"></span>
+                                </template>
+                              </div>
+                            </template>
+                          </div>
+                        </template>
+                        <!-- Depth 3 -->
+                        <template x-for="n3 in n2.children" :key="n3.path">
+                          <div>
+                            <div class="tree-group-label" style="padding-left:4.25rem" @click="toggleNode(n3.path)">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="none"
+                                   viewBox="0 0 24 24"
+                                   stroke="currentColor" stroke-width="2.5"
+                                   :style="isNodeExpanded(n3.path) ? '' : 'transform:rotate(-90deg)'"
+                                   style="transition:transform 0.15s">
+                                <polyline points="6 9 12 15 18 9"/>
+                              </svg>
+                              <span x-text="n3.name"></span>
+                              <span style="opacity:0.5" x-text="'(' + countHosts(n3) + ')'"></span>
+                            </div>
+                            <div x-show="isNodeExpanded(n3.path)">
+                              <template x-for="conn in n3.hosts" :key="conn.name + conn.server">
+                                <div class="conn-row" style="padding-left:6rem" :class="{ selected: isSelected(conn) }"
+                                     @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+                                       viewBox="0 0 24 24"
+                                       stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.45">
+                                    <polyline points="4 17 10 11 4 5"/>
+                                    <line x1="12" y1="19" x2="20" y2="19"/>
+                                  </svg>
+                                  <span class="flex-1 truncate font-medium" x-text="conn.name"></span>
+                                  <span class="text-[11px]" style="color:var(--color-muted)"
+                                        x-text="conn.server"></span>
+                                  <template x-if="conn.labels">
+                                    <div class="flex gap-1 flex-wrap ml-1">
+                                      <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
+                                        <span class="tag" x-text="tag"></span>
+                                      </template>
+                                    </div>
+                                  </template>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+    <!-- TABLE VIEW -->
+    <div x-show="view === 'table'" class="overflow-x-auto overflow-y-auto" style="max-height:420px">
+      <template x-if="connections.length === 0">
+        <div class="empty-state" x-text="t.noConnections"></div>
+      </template>
+      <template x-if="connections.length > 0 && filteredConnections.length === 0">
+        <div class="empty-state" x-text="t.noResults"></div>
+      </template>
+      <template x-if="filteredConnections.length > 0">
+        <table class="data-table">
+          <thead>
+          <tr>
+            <th @click="sortBy('name')" x-text="t.thName     + ' ' + sortIcon('name')"></th>
+            <th @click="sortBy('server')" x-text="t.thServer   + ' ' + sortIcon('server')"></th>
+            <th @click="sortBy('port')" x-text="t.thPort     + ' ' + sortIcon('port')"></th>
+            <th @click="sortBy('username')" x-text="t.thUsername + ' ' + sortIcon('username')"></th>
+            <th @click="sortBy('group')" x-text="t.thGroup    + ' ' + sortIcon('group')"></th>
+            <th x-text="t.thLabels"></th>
+          </tr>
+          </thead>
+          <tbody>
+          <template x-for="conn in sortedConnections" :key="conn.name + conn.server">
+            <tr :class="{ selected: isSelected(conn) }"
+                @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
+              <td class="font-medium" x-text="conn.name"></td>
+              <td x-text="conn.server"></td>
+              <td x-text="conn.port"></td>
+              <td x-text="conn.username"></td>
+              <td x-text="conn.group"></td>
+              <td>
+                <div class="flex gap-1 flex-wrap">
+                  <template x-for="tag in (conn.labels||'').split(' ').filter(Boolean)" :key="tag">
+                    <span class="tag" x-text="tag"></span>
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </template>
+          </tbody>
+        </table>
+      </template>
+    </div>
+  </div>
+  <!-- Details bar -->
+  <div class="details-bar" x-text="detailsText"></div>
+  <!-- Bottom actions -->
+  <div class="flex items-center gap-2 mt-1 flex-wrap">
+    <button @click="openAddModal()" class="btn-primary gap-1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      <span x-text="t.addConnection"></span>
+    </button>
+    <button @click="connectSelected()" class="btn-secondary gap-1.5"
+            :disabled="!selectedConn" :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <polyline points="4 17 10 11 4 5"/>
+        <line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+      <span x-text="t.connect"></span>
+    </button>
+    <button @click="openEditModal(selectedConn)" class="btn-secondary gap-1.5"
+            :disabled="!selectedConn" :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <span x-text="t.edit"></span>
+    </button>
+    <button @click="deleteSelected()" class="btn-danger gap-1.5"
+            :disabled="!selectedConn" :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+      <span x-text="t.delete"></span>
+    </button>
+    <button @click="deleteAll()" class="btn-danger gap-1.5"
+            :disabled="connections.length === 0"
+            :style="connections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+        <line x1="18" y1="18" x2="22" y2="22"/>
+        <line x1="22" y1="18" x2="18" y2="22"/>
+      </svg>
+      <span x-text="t.deleteAll"></span>
+    </button>
+    <div class="flex-1"></div>
+    <button @click="importCSV()" class="btn-secondary gap-1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <span x-text="t.importCsv"></span>
+    </button>
+    <button @click="exportCSV()" class="btn-secondary gap-1.5" :disabled="connections.length === 0"
+            :style="connections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 16 12 21 17 16"/>
+        <line x1="12" y1="21" x2="12" y2="9"/>
+      </svg>
+      <span x-text="t.exportCsv"></span>
+    </button>
+    <button @click="showHelp = true" class="btn-secondary gap-1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+           stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span x-text="t.help"></span>
+    </button>
+  </div>
+  <!-- Footer -->
+  <div class="divider pt-5 flex items-center justify-center text-[11px] mt-6">
+    <span style="opacity:0.7;color:var(--color-muted)" x-text="t.madeWith"></span>
+    <a href="https://claude.ai" target="_blank" rel="noopener" class="footer-link ml-1">Claude</a>
+    <span style="opacity:0.7;color:var(--color-muted)" class="ml-1">(Anthropic)</span>
+  </div>
+</div>
+<!-- ADD / EDIT MODAL -->
+<div x-show="showAddModal" class="modal-overlay" @click.self="closeAddModal()">
+  <div class="modal-box">
+    <div class="flex items-center justify-between mb-5">
+      <span class="font-medium" x-text="isEditing ? t.editConnectionTitle : t.addConnectionTitle"></span>
+      <button @click="closeAddModal()" class="btn-secondary px-2 py-1 text-[11px]">✕</button>
+    </div>
+    <div class="flex flex-col gap-3">
+      <div>
+        <label class="label mb-1" x-text="t.fieldName"></label>
+        <input class="field-input" type="text" x-model="form.name"/>
+        <span x-show="formErrors.name" class="text-[11px]" style="color:var(--color-danger)"
+              x-text="formErrors.name"></span>
+      </div>
+      <div class="flex gap-2">
+        <div class="flex-1">
+          <label class="label mb-1" x-text="t.fieldServer"></label>
+          <input class="field-input" type="text" x-model="form.server" placeholder="10.0.1.10"/>
+          <span x-show="formErrors.server" class="text-[11px]" style="color:var(--color-danger)"
+                x-text="formErrors.server"></span>
+        </div>
+        <div style="width:80px">
+          <label class="label mb-1" x-text="t.fieldPort"></label>
+          <input class="field-input" type="text" x-model="form.port" placeholder="22"/>
+          <span x-show="formErrors.port" class="text-[11px]" style="color:var(--color-danger)"
+                x-text="formErrors.port"></span>
+        </div>
+      </div>
+      <div>
+        <label class="label mb-1" x-text="t.fieldUsername"></label>
+        <input class="field-input" type="text" x-model="form.username" placeholder="ubuntu"/>
+        <span x-show="formErrors.username" class="text-[11px]" style="color:var(--color-danger)"
+              x-text="formErrors.username"></span>
+      </div>
+      <div>
+        <label class="label mb-1" x-text="t.fieldGroup"></label>
+        <input class="field-input" type="text" x-model="form.group" :placeholder="t.fieldGroupHint"/>
+        <span x-show="formErrors.group" class="text-[11px]" style="color:var(--color-danger)"
+              x-text="formErrors.group"></span>
+      </div>
+      <div>
+        <label class="label mb-1" x-text="t.fieldLabels"></label>
+        <input class="field-input" type="text" x-model="form.labels" placeholder="nginx frontend"/>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button @click="closeAddModal()" class="btn-secondary" x-text="t.cancel"></button>
+      <button @click="saveForm()" class="btn-primary" x-text="t.save"></button>
+    </div>
+  </div>
+</div>
+<!-- CONFIRM DELETE -->
+<div x-show="showConfirmDelete" class="modal-overlay" @click.self="showConfirmDelete = false">
+  <div class="confirm-dialog">
+    <div class="font-medium mb-2" x-text="t.confirmDeleteTitle"></div>
+    <div class="text-[12px] mb-5" style="color:var(--color-muted)"
+         x-text="selectedConn ? t.confirmDeleteMsg(selectedConn.name) : ''"></div>
+    <div class="flex justify-end gap-2">
+      <button @click="showConfirmDelete = false" class="btn-secondary" x-text="t.confirmNo"></button>
+      <button @click="confirmDelete()" class="btn-danger" x-text="t.confirmYes"></button>
+    </div>
+  </div>
+</div>
+<!-- CONFIRM DELETE ALL -->
+<div x-show="showConfirmDeleteAll" class="modal-overlay" @click.self="showConfirmDeleteAll = false">
+  <div class="confirm-dialog">
+    <div class="font-medium mb-2" x-text="t.confirmDeleteAllTitle"></div>
+    <div class="text-[12px] mb-5" style="color:var(--color-muted)"
+         x-text="t.confirmDeleteAllMsg(connections.length)"></div>
+    <div class="flex justify-end gap-2">
+      <button @click="showConfirmDeleteAll = false" class="btn-secondary" x-text="t.confirmNo"></button>
+      <button @click="confirmDeleteAll()" class="btn-danger" x-text="t.confirmYes"></button>
+    </div>
+  </div>
+</div>
+<!-- HELP MODAL -->
+<div x-show="showHelp" class="modal-overlay" @click.self="showHelp = false">
+  <div class="modal-box" style="max-width:560px">
+    <div class="flex items-center justify-between mb-4">
+      <span class="font-medium" x-text="t.helpTitle"></span>
+      <button @click="showHelp = false" class="btn-secondary px-2 py-1 text-[11px]">✕</button>
+    </div>
+    <pre class="text-[11px] overflow-auto"
+         style="color:var(--color-muted);max-height:400px;white-space:pre-wrap;line-height:1.6" x-text="helpText"></pre>
+    <div class="flex justify-end mt-4">
+      <button @click="showHelp = false" class="btn-secondary" x-text="t.helpClose"></button>
+    </div>
+  </div>
+</div>
+<!-- TOAST -->
+<div x-show="toast" x-transition style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:100;pointer-events:none">
+  <div class="card px-4 py-2.5 text-[12px]"
+       :style="toast?.isError ? 'color:var(--color-danger)' : 'color:var(--color-success)'">
+    <span x-text="toast?.msg"></span>
+  </div>
+</div>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
