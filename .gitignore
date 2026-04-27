@@ -21,3 +21,4 @@ build/
 # npm
 frontend/node_modules/
 frontend/yarn.lock
+frontend/wailsjs/
