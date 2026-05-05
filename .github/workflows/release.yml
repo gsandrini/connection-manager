@@ -53,10 +53,6 @@ jobs:
         if: matrix.build.os == 'ubuntu-latest'
         run: wails build -platform ${{ matrix.build.platform }} -clean -tags webkit2_41
 
-      - name: Build (Windows)
-        if: matrix.build.os == 'windows-latest'
-        run: wails build -platform ${{ matrix.build.platform }} -clean
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
