@@ -12,8 +12,10 @@ import (
 
 // App struct
 type App struct {
-	ctx  context.Context
-	lang string
+	ctx   context.Context
+	lang  string
+	terms *termManager
+	vault *vault
 }
 
 // translations holds all UI strings per language
@@ -21,16 +23,22 @@ var translations = map[string]map[string]string{
 	"it": {
 		"noTerminal":    "Nessun emulatore di terminale trovato.",
 		"unsupportedOS": "Sistema operativo non supportato: ",
+		"noSSH":         "Comando ssh non trovato nel PATH.",
+		"noShell":       "Nessuna shell trovata.",
+		"invalidTarget": "Utente o server non validi.",
 	},
 	"en": {
 		"noTerminal":    "No terminal emulator found.",
 		"unsupportedOS": "Unsupported OS: ",
+		"noSSH":         "ssh command not found in PATH.",
+		"noShell":       "No shell found.",
+		"invalidTarget": "Invalid username or server.",
 	},
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{terms: newTermManager(), vault: newVault()}
 }
 
 // startup is called when the app starts

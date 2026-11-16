@@ -4,7 +4,9 @@
 
 ```txt
 /
-├── app.go                         # Core application logic
+├── app.go                         # Core application logic, external terminal
+├── terminal.go                    # Embedded terminal sessions (PTY + Wails events)
+├── vault.go                       # Master-password vault (Argon2id + AES-256-GCM)
 ├── main.go                        # Entry point
 │
 ├── frontend/                      # UI layer
@@ -15,10 +17,13 @@
 │   └── assets/
 │       ├── css/
 │       │   ├── tailwind.src.css  # Edit this file
-│       │   └── tailwind.min.css  # Generated (compiled)
+│       │   ├── tailwind.min.css  # Generated (compiled)
+│       │   └── xterm.css         # xterm.js styles (vendored)
 │       │
 │       └── js/
-│           ├── app.js            # Frontend app logic
+│           ├── app.js            # Frontend app logic (incl. terminal tabs)
+│           ├── xterm.min.js      # xterm.js (vendored)
+│           ├── xterm-addon-fit.min.js
 │           └── alpine.min.js     # Local Alpine bundle
 │
 ├── docs/                          # Technical documentation
@@ -48,6 +53,55 @@ System / External Services
 ```
 
 `app.go` contains the core application logic exposed to the frontend via Wails bindings.
+
+---
+
+## Embedded terminal
+
+```txt
+xterm.js (tab)  --keystrokes-->  App.WriteTerminal(id, data)  --> PTY --> ssh
+xterm.js (tab) <--base64 bytes--  event "term:data:<id>"      <-- PTY <-- ssh
+xterm.js (tab)  --cols/rows--->  App.ResizeTerminal(id, c, r) --> pty.Setsize
+                <--exit code---  event "term:exit:<id>"
+```
+
+- `OpenLocalTerminal` runs the user's `$SHELL` (fallback `bash`, then `sh`) in the home
+  directory inside a PTY. SSH and local sessions share the same `launch()` helper and
+  the same events, so input, resize, close and reconnect work identically.
+- `OpenTerminal` runs the system `ssh` inside a PTY, so `~/.ssh/config`, keys,
+  `ssh-agent` and password prompts work as in a normal terminal.
+- Output is base64 encoded so multi-byte UTF-8 characters are never split.
+- Terminal instances are kept in a plain JS `Map` (not in Alpine state).
+- vendored xterm.js files come from the `@xterm/xterm` and `@xterm/addon-fit`
+  npm packages (copy `lib/*.js` and `css/xterm.css` when upgrading).
+- The PTY layer is Linux/macOS only (no ConPTY on Windows).
+
+## Password vault
+
+```txt
+master password --Argon2id(salt, t, m, p)--> 256-bit key  (memory of the Go process only)
+password --AES-256-GCM(random nonce)--> blob = base64(nonce || ciphertext+tag)
+```
+
+- `VaultCreate` / `VaultUnlock` / `VaultLock` / `VaultIsUnlocked` manage the key.
+  The metadata returned by `VaultCreate` (salt, KDF parameters, an encrypted
+  check value) is **not secret**: the frontend keeps it in `localStorage`
+  (`connection-manager-vault`). `VaultUnlock` validates the master by decrypting
+  the check value and clamps the KDF parameters (they come from `localStorage`).
+- `EncryptSecret` / `EncryptMany` return opaque blobs, one independent
+  ciphertext per connection. The blobs live in each connection as `passwordEnc`.
+  The CSV export never includes them.
+- The frontend never receives a key or a plaintext password: `OpenTerminal`
+  gets the blob and decrypts it in Go.
+- Auto-fill (`terminal.go`): the output of the PTY is scanned for the exact
+  prompt `user@host's password: ` (or `(user@host) Password: `), where `host`
+  is the hostname resolved with `ssh -G` (so aliases in `~/.ssh/config` work).
+  The password is sent **once per session**; other prompts (sudo, nested ssh to
+  another host, a ProxyJump host) never match.
+- Every connection has a stable `id` (generated at load for older data), used
+  for selection, editing and deletion.
+- Forgetting the master means the saved passwords are lost: the unlock dialog
+  offers to delete the vault (connections are kept).
 
 ---
 

@@ -30,7 +30,8 @@ func main() {
 		Linux: &linux.Options{
 			Icon: icon,
 		},
-		OnStartup: app.startup,
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
 		Bind: []interface{}{
 			app,
 		},

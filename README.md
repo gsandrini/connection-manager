@@ -1,6 +1,6 @@
 # Connection Manager
 
-Connection Manager keeps all SSH connections organized in one place. Browse them in tree or table view, filter by any field in real time, import and export via CSV, and connect instantly opening a native terminal.
+Connection Manager keeps all SSH connections organized in one place. Browse them in tree or table view, filter by any field in real time, import and export via CSV, and connect instantly: every session opens in its own **tab with an embedded terminal**, so you never end up with a pile of terminal windows. Passwords can be saved encrypted behind a master password.
 
 ---
 
@@ -14,17 +14,70 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 
 ![image](./assets/screenshots/connection-manager-tree.png)
 
+### Terminal tabs
+
+<!-- TODO screenshot: 2-3 open tabs with status dots, one session running something colourful (ls --color, htop). Fake hosts only. Replace assets/screenshots/connection-manager-tabs.png -->
+![Terminal tabs](./assets/screenshots/connection-manager-tabs.png)
+
+### Bulk selection
+
+<!-- TODO screenshot: search field filled (e.g. by username), several rows ticked, "N selected" bar visible. Replace assets/screenshots/connection-manager-bulk.png -->
+![Bulk selection](./assets/screenshots/connection-manager-bulk.png)
+
+### Bulk password change
+
+<!-- TODO screenshot (optional, delete this section if you skip it): the "Change password for N connections" dialog, no real password. Replace assets/screenshots/connection-manager-bulk-dialog.png -->
+![Bulk password change](./assets/screenshots/connection-manager-bulk-dialog.png)
+
 ---
 
 ## Features
 
+**Connections**
+
 - Manage SSH connections with name, server, port, username and group
 - Tree view grouped by environment and group
 - Table view with sortable columns
-- Real-time search across all fields
-- Import connections from CSV
-- Export connections to CSV
-- Opens a native terminal on connect
+- Real-time search across name, server, username, group and labels
+- Import connections from CSV / export connections to CSV (passwords are never exported)
+
+**Terminal tabs**
+
+- Embedded SSH terminal in tabs (xterm.js + PTY): many sessions, one window
+- Uses your system `ssh`, so keys, `ssh-agent` and `~/.ssh/config` work as usual
+- Press Enter on an ended session to reconnect
+- Optional: open a connection in an external native terminal ("External" button)
+- Local shell in a tab: your own `$SHELL`, opened in your home directory ("Local" button, the `+` in the tab bar, or `Ctrl+Shift+T`)
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+Shift+T` | New local shell tab |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
+| `Ctrl+Shift+W` or middle-click | Close the current tab |
+| `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste |
+
+**Saved passwords** (optional)
+
+- Protected by a master password asked at startup, like KeePass
+- Encrypted with AES-256-GCM, key derived with Argon2id and kept only in the backend's memory
+- Typed automatically, once, only at the `user@host's password:` prompt of the right server
+- Bulk password change: search (e.g. by username and group), tick rows or whole groups, set the new password
+
+---
+
+## Requirements
+
+- Linux (the embedded terminal also works on macOS; Windows is not supported)
+- The `ssh` command available in your `PATH`
+
+---
+
+## Security notes
+
+- Passwords are stored encrypted in the app's local storage; the master password and the key are never saved.
+- If you forget the master password the saved passwords cannot be recovered. You can reset the vault (connections are kept).
+- Whoever can use your unlocked session can use the saved passwords, as with any password manager.
+- Prefer SSH keys when you can: they need no password at all.
 
 ---
 
@@ -48,6 +101,9 @@ curl -fsSL https://github.com/gsandrini/connection-manager/releases/latest/downl
 
 - [Wails](https://wails.io) - Desktop framework (Go + WebView)
 - [Go](https://golang.org) - Backend logic
+- [xterm.js](https://xtermjs.org) - Embedded terminal (bundled locally)
+- [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto) - Argon2id key derivation for the password vault
+- [creack/pty](https://github.com/creack/pty) - PTY for the SSH sessions
 - [Alpine.js](https://alpinejs.dev) - Reactive UI (bundled locally)
 - [Tailwind CSS](https://tailwindcss.com) - Styling (compiled locally)
 - [JetBrains Mono](https://www.jetbrains.com/lp/mono/) - Typography

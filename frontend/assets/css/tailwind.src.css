@@ -451,3 +451,151 @@ body {
     background: rgba(255, 255, 255, 0.15);
     border-radius: 3px;
 }
+
+/* TERMINAL TABS */
+body {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.app-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.tabbar {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    padding: 0.35rem 0.5rem 0;
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 14rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 11px;
+    color: var(--color-muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 0.5rem 0.5rem 0 0;
+    cursor: pointer;
+    user-select: none;
+    background: transparent;
+    white-space: nowrap;
+}
+
+.tab:hover {
+    background-color: var(--color-hover-bg);
+}
+
+.tab.active {
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    margin-bottom: -1px;
+}
+
+.tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: var(--color-muted);
+}
+
+.tab-dot.running {
+    background-color: var(--color-success);
+}
+
+.tab-dot.connecting {
+    background-color: #d69e2e;
+}
+
+.tab-close {
+    font-size: 9px;
+    line-height: 1;
+    padding: 0.2rem 0.3rem;
+    border-radius: 0.25rem;
+    opacity: 0.5;
+    background: transparent;
+    color: inherit;
+}
+
+.tab-close:hover {
+    opacity: 1;
+    background-color: var(--color-hover-bg);
+}
+
+.term-area {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    background-color: #0f0f0f;
+}
+
+.term-pane {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+/* padding goes on .xterm itself: FitAddon subtracts it from the available size */
+.term-pane .xterm {
+    height: 100%;
+    padding: 8px;
+}
+
+
+/* BULK SELECTION */
+.row-check {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--color-text);
+    margin-right: 0.15rem;
+}
+
+.bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 12px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-focus);
+    border-radius: 0.5rem;
+}
+
+.tab-add {
+    align-self: center;
+    margin-left: 0.25rem;
+    padding: 0.15rem 0.55rem;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--color-muted);
+    background: transparent;
+    border-radius: 0.375rem;
+}
+
+.tab-add:hover {
+    color: var(--color-text);
+    background-color: var(--color-hover-bg);
+}

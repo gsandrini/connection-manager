@@ -1,10 +1,13 @@
 name,server,port,username,group,labels
-frontend,192.168.10.10,22,ubuntu,dev/web,nginx frontend
+frontend 01,192.168.10.10,22,ubuntu,dev/web,nginx frontend 01
+frontend 02,192.168.10.11,22,ubuntu,dev/web,nginx frontend 02
 db,192.168.10.20,22,ubuntu,dev/db,postgres database
 redis,192.168.10.30,22,ubuntu,dev/cache,redis cache
-frontend,172.16.10.10,22,ubuntu,qa/web,nginx frontend
+frontend 01,172.16.10.10,22,ubuntu,qa/web,nginx frontend 01
+frontend 02,172.16.10.11,22,ubuntu,qa/web,nginx frontend 02
 db,172.16.10.20,22,ubuntu,qa/db,postgres database
 redis,172.16.10.30,22,ubuntu,qa/cache,redis cache
-frontend,10.100.10.10,22,ubuntu,prod/web,nginx frontend
+frontend 01,10.100.10.10,22,ubuntu,prod/web,nginx frontend 01
+frontend 02,10.100.10.11,22,ubuntu,prod/web,nginx frontend 02
 db,10.100.10.20,22,ubuntu,prod/db,postgres database
 redis,10.100.10.30,22,ubuntu,prod/cache,redis cache
