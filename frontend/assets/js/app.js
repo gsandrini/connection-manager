@@ -66,6 +66,14 @@ const TRANSLATIONS = {
     connectExternal: 'Esterno',
     connectExternalHint: 'Apri in un terminale esterno',
     terminalError: 'Impossibile avviare la sessione SSH.',
+    ctxCopy: 'Copia',
+    ctxPaste: 'Incolla',
+    ctxPastePw: 'Incolla password',
+    ctxSelectAll: 'Seleziona tutto',
+    ctxClear: 'Pulisci schermo',
+    ctxPwLocked: 'Vault bloccato',
+    ctxPwNone: 'Non salvata',
+    pastePwError: 'Impossibile incollare la password (vault bloccato o sessione chiusa).',
     sessionEnded: (code) => `[Sessione terminata (codice ${code}) - premi Invio per riconnetterti]`,
     thName: 'Nome', thServer: 'Server', thPort: 'Porta',
     thUsername: 'Username', thGroup: 'Gruppo', thLabels: 'Labels',
@@ -160,6 +168,14 @@ const TRANSLATIONS = {
     connectExternal: 'External',
     connectExternalHint: 'Open in an external terminal',
     terminalError: 'Could not start the SSH session.',
+    ctxCopy: 'Copy',
+    ctxPaste: 'Paste',
+    ctxPastePw: 'Paste password',
+    ctxSelectAll: 'Select all',
+    ctxClear: 'Clear screen',
+    ctxPwLocked: 'Vault locked',
+    ctxPwNone: 'Not saved',
+    pastePwError: 'Could not paste the password (vault locked or session closed).',
     sessionEnded: (code) => `[Session ended (code ${code}) - press Enter to reconnect]`,
     thName: 'Name', thServer: 'Server', thPort: 'Port',
     thUsername: 'Username', thGroup: 'Group', thLabels: 'Labels',
@@ -225,6 +241,8 @@ SCHEDE TERMINALE
   Ctrl+Tab / Ctrl+Shift+Tab : scheda successiva / precedente
   Ctrl+Shift+W              : chiudi la scheda corrente
   Ctrl+Shift+C / Ctrl+Shift+V : copia / incolla
+  Clic destro nel terminale  : menu Copia / Incolla / Incolla password /
+                               Seleziona tutto / Pulisci schermo
   Clic centrale sulla scheda : chiudi
   Invio a sessione terminata : riconnetti
 
@@ -261,6 +279,8 @@ PASSWORD SALVATE
   derivata dalla master password, chiesta a ogni avvio).
   Vengono inviate al terminale solo davanti al prompt
   "utente@host's password:" del server corretto, una volta.
+  Clic destro > "Incolla password" la scrive nel terminale
+  quando serve (es. sudo), senza premere Invio.
 
 CAMBIO PASSWORD MASSIVO
   Cerca (es. per username e gruppo), spunta le righe o un
@@ -285,6 +305,8 @@ TERMINAL TABS
   Ctrl+Tab / Ctrl+Shift+Tab : next / previous tab
   Ctrl+Shift+W              : close current tab
   Ctrl+Shift+C / Ctrl+Shift+V : copy / paste
+  Right-click in the terminal: Copy / Paste / Paste password /
+                               Select all / Clear screen menu
   Middle-click on a tab     : close
   Enter on an ended session : reconnect
 
@@ -321,6 +343,8 @@ SAVED PASSWORDS
   from the master password, asked at every start).
   They are typed into the terminal only at the
   "user@host's password:" prompt of the right server, once.
+  Right-click > "Paste password" types it into the terminal
+  on demand (e.g. sudo), without pressing Enter.
 
 BULK PASSWORD CHANGE
   Search (e.g. by username and group), tick rows or a group,
@@ -405,6 +429,100 @@ const TERM_THEME = {
   background: '#0f0f0f', foreground: '#e6e6e3', cursor: '#f7f7f5',
   selectionBackground: 'rgba(255,255,255,0.25)',
 };
+
+// Clipboard used by the right-click menu: Wails' native clipboard first
+// (navigator.clipboard is unreliable in some webviews), browser API as fallback.
+async function clipWrite(text) {
+  try {
+    if (window.runtime && window.runtime.ClipboardSetText) {
+      if (await window.runtime.ClipboardSetText(text)) return true;
+    }
+  } catch { /* fall through */ }
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* ignore */ }
+  return false;
+}
+
+async function clipRead() {
+  try {
+    if (window.runtime && window.runtime.ClipboardGetText) {
+      return (await window.runtime.ClipboardGetText()) || '';
+    }
+  } catch { /* fall through */ }
+  try { return await navigator.clipboard.readText(); } catch { /* ignore */ }
+  return '';
+}
+
+/* >>> context menu (single shared element) */
+let TERM_MENU = null;
+
+function hideTermMenu() {
+  if (TERM_MENU) TERM_MENU.style.display = 'none';
+}
+
+/*
+ * items: [{ label, hint?, disabled?, action }] or the string 'sep'.
+ * Opens the menu at the given viewport position, kept inside the window.
+ */
+function showTermMenu(x, y, items) {
+  if (!TERM_MENU) {
+    TERM_MENU = document.createElement('div');
+    TERM_MENU.className = 'ctx-menu';
+    TERM_MENU.setAttribute('role', 'menu');
+    // keep the terminal focused / selection intact while clicking the menu
+    TERM_MENU.addEventListener('mousedown', (ev) => ev.preventDefault());
+    TERM_MENU.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    document.body.appendChild(TERM_MENU);
+    // dismiss: click elsewhere, Esc, wheel, resize, window blur
+    window.addEventListener('mousedown', (ev) => {
+      if (TERM_MENU.style.display !== 'none' && !TERM_MENU.contains(ev.target)) hideTermMenu();
+    }, true);
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && TERM_MENU.style.display !== 'none') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        hideTermMenu();
+      }
+    }, true);
+    window.addEventListener('wheel', hideTermMenu, { passive: true });
+    window.addEventListener('resize', hideTermMenu);
+    window.addEventListener('blur', hideTermMenu);
+  }
+
+  TERM_MENU.textContent = '';
+  for (const it of items) {
+    if (it === 'sep') {
+      const sep = document.createElement('div');
+      sep.className = 'ctx-sep';
+      TERM_MENU.appendChild(sep);
+      continue;
+    }
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ctx-item';
+    b.setAttribute('role', 'menuitem');
+    b.disabled = !!it.disabled;
+    const l = document.createElement('span');
+    l.textContent = it.label;
+    b.appendChild(l);
+    if (it.hint) {
+      const h = document.createElement('span');
+      h.className = 'ctx-hint';
+      h.textContent = it.hint;
+      b.appendChild(h);
+    }
+    b.addEventListener('click', () => {
+      hideTermMenu();
+      it.action();
+    });
+    TERM_MENU.appendChild(b);
+  }
+
+  TERM_MENU.style.display = 'block';
+  const w = TERM_MENU.offsetWidth, h = TERM_MENU.offsetHeight;
+  TERM_MENU.style.left = Math.max(0, Math.min(x, window.innerWidth - w - 4)) + 'px';
+  TERM_MENU.style.top = Math.max(0, Math.min(y, window.innerHeight - h - 4)) + 'px';
+}
+/* <<< context menu */
 
 function ConnectionManagerApp() {
   return {
@@ -954,7 +1072,7 @@ function ConnectionManagerApp() {
       const same = this.tabs.filter(t => t.connName === conn.name).length;
       const id = 't' + (++this.tabSeq) + Math.random().toString(36).slice(2, 7);
       this.tabs.push({
-        id, connName: conn.name,
+        id, connName: conn.name, connId: conn.id,
         label: same ? `${conn.name} (${same + 1})` : conn.name,
         title: conn.local ? 'shell' : `${conn.username}@${conn.server}:${conn.port}`,
         status: 'connecting', exitCode: null,
@@ -994,6 +1112,45 @@ function ConnectionManagerApp() {
           }
         }
         return true;
+      });
+
+      // Right-click menu: Copy / Paste / Paste saved password / Select all / Clear screen
+      const copySel = () => {
+        const sel = term.getSelection();
+        if (sel) clipWrite(sel);
+      };
+      // term.paste() honours bracketed-paste mode and converts newlines
+      const pasteClip = async () => {
+        const text = await clipRead();
+        if (text) term.paste(text);
+        term.focus();
+      };
+      el.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        const items = [
+          { label: this.t.ctxCopy, hint: 'Ctrl+Shift+C', disabled: !term.hasSelection(),
+            action: () => { copySel(); term.focus(); } },
+          { label: this.t.ctxPaste, hint: 'Ctrl+Shift+V', action: pasteClip },
+        ];
+        if (!conn.local) {
+          // up-to-date record: the password may have changed since the tab opened
+          const cur = this.connections.find(c => c.id === conn.id) || conn;
+          const noPw = !cur.passwordEnc;
+          const locked = !noPw && this.vaultState !== 'unlocked';
+          items.push('sep', {
+            label: this.t.ctxPastePw,
+            hint: noPw ? this.t.ctxPwNone : (locked ? this.t.ctxPwLocked : ''),
+            disabled: noPw || locked,
+            action: () => this.pasteSavedPassword(id, cur.passwordEnc),
+          });
+        }
+        items.push(
+          'sep',
+          { label: this.t.ctxSelectAll, action: () => { term.selectAll(); term.focus(); } },
+          // clears the on-screen buffer and scrollback, the shell is not touched
+          { label: this.t.ctxClear, action: () => { term.clear(); term.focus(); } },
+        );
+        showTermMenu(ev.clientX, ev.clientY, items);
       });
 
       const App = window.go.main.App;
@@ -1044,6 +1201,18 @@ function ConnectionManagerApp() {
         this.showToast(this.t.terminalError, true);
         console.error('OpenTerminal error:', err);
       }
+    },
+    async pasteSavedPassword(id, passwordEnc) {
+      // The password is decrypted and typed by the Go backend: it never
+      // reaches the frontend, and no Enter is sent.
+      try {
+        await window.go.main.App.PasteSavedPassword(id, passwordEnc || '');
+      } catch (err) {
+        this.showToast(this.t.pastePwError, true);
+        console.error('PasteSavedPassword error:', err);
+      }
+      const e = TERMS.get(id);
+      if (e) e.term.focus();
     },
     selectTab(id) {
       this.activeTab = id;

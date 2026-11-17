@@ -237,6 +237,30 @@ func (a *App) WriteTerminal(id, data string) {
 	_, _ = s.ptmx.Write([]byte(data))
 }
 
+// PasteSavedPassword writes the saved password of a connection into a running
+// session, on demand (context menu "Paste password"). Unlike the automatic
+// fill it does not wait for ssh's prompt and it does not press Enter: the
+// user decides where it goes and confirms it. The plaintext stays inside this
+// process, it is never returned to the frontend.
+func (a *App) PasteSavedPassword(id, passwordEnc string) error {
+	if passwordEnc == "" {
+		return errors.New("no saved password")
+	}
+	a.terms.mu.Lock()
+	s := a.terms.sessions[id]
+	a.terms.mu.Unlock()
+	if s == nil {
+		return errors.New("session not found")
+	}
+	pw, err := a.vault.decrypt(passwordEnc)
+	if err != nil {
+		return err // vault locked or blob unreadable
+	}
+	defer zero(pw)
+	_, err = s.ptmx.Write(pw)
+	return err
+}
+
 // ResizeTerminal updates the PTY window size (SIGWINCH is sent by the kernel).
 func (a *App) ResizeTerminal(id string, cols, rows int) {
 	if cols <= 0 || rows <= 0 {

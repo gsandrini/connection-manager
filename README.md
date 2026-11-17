@@ -55,12 +55,14 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+Shift+W` or middle-click | Close the current tab |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste |
+| Right-click in the terminal | Menu: Copy, Paste, Paste password, Select all, Clear screen |
 
 **Saved passwords** (optional)
 
 - Protected by a master password asked at startup, like KeePass
 - Encrypted with AES-256-GCM, key derived with Argon2id and kept only in the backend's memory
 - Typed automatically, once, only at the `user@host's password:` prompt of the right server
+- On demand: right-click in an SSH terminal > **Paste password** types the saved password into the session (e.g. for `sudo`), without pressing Enter. It is decrypted and typed by the backend and never reaches the UI or the clipboard
 - Bulk password change: search (e.g. by username and group), tick rows or whole groups, set the new password
 
 ---
