@@ -1,44 +1,46 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Connection Manager</title>
-  <link rel="stylesheet" href="assets/css/tailwind.min.css" />
-  <link rel="stylesheet" href="assets/css/xterm.css" />
+  <meta name="theme-color" content="#f7f7f4" />
+  <script>
+    /* Apply saved (or system) language and theme before first paint, so there is no flash */
+    (function () {
+      var lang, theme;
+      try {
+        lang = localStorage.getItem('language');
+        theme = localStorage.getItem('theme');
+      } catch (_) {}
+      if (lang !== 'it' && lang !== 'en') {
+        lang = (navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en';
+      }
+      if (theme !== 'dark' && theme !== 'light') {
+        theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      var root = document.documentElement;
+      root.lang = lang;
+      root.dataset.theme = theme;
+      if (theme === 'dark') {
+        document.querySelector('meta[name="theme-color"]').content = '#181a1f';
+      }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/tailwind.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="assets/css/xterm.css" />
   <script defer src="assets/js/alpine.min.js"></script>
-  <style>
-    /* Terminal right-click menu */
-    .ctx-menu {
-      position: fixed; display: none; z-index: 200; min-width: 12rem; padding: 0.25rem;
-      background: var(--color-bg); color: var(--color-text);
-      border: 1px solid var(--color-border-focus); border-radius: 0.5rem;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      font-family: 'JetBrains Mono', monospace; font-size: 12px; user-select: none;
-    }
-    .ctx-item {
-      display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1.5rem;
-      padding: 0.4rem 0.6rem; border-radius: 0.35rem; text-align: left;
-      background: transparent; color: inherit; border: 0; cursor: pointer; font: inherit;
-    }
-    .ctx-item:hover:not(:disabled) { background: var(--color-hover-bg); }
-    .ctx-item:disabled { opacity: 0.4; cursor: default; }
-    .ctx-hint { color: var(--color-muted); font-size: 11px; }
-    .ctx-sep { height: 1px; margin: 0.25rem 0.1rem; background: var(--color-border); }
-  </style>
 </head>
-
-
-<body x-data="ConnectionManagerApp()" x-cloak class="font-mono text-[13px] min-h-screen">
+<body x-data="ConnectionManagerApp()" x-cloak class="text-sm min-h-screen">
   <!-- TAB BAR (visible only while at least one terminal session is open) -->
   <div x-show="tabs.length > 0" class="tabbar">
     <button class="tab" :class="{ active: activeTab === 'home' }" @click="selectTab('home')">
       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-        stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+        stroke="currentColor" stroke-width="2" class="icon-fixed">
         <path d="M3 3h4v4H3zM3 10h4v4H3zM3 17h4v4H3zM10 4h11M10 12h11M10 20h11" />
       </svg>
       <span class="tab-label" x-text="t.tabHome"></span>
@@ -56,13 +58,13 @@
   </div>
   <!-- HOME (connection list) -->
   <div x-show="activeTab === 'home'" class="app-scroll">
-  <div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="home-content max-w-4xl mx-auto py-4 px-4">
     <!-- Header -->
     <div class="mb-6">
       <div class="flex items-center justify-between mb-1">
-        <span class="text-lg font-medium tracking-tight" x-text="t.title"></span>
+        <span class="app-title" x-text="t.title"></span>
         <div class="flex items-center gap-2">
-          <button @click="vaultButton()" class="btn-secondary text-[11px] px-2.5 py-1 rounded-md gap-1.5"
+          <button @click="vaultButton()" class="btn-secondary"
             :title="vaultTitle">
             <svg x-show="vaultState === 'none'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
               viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -75,14 +77,31 @@
               <path d="M8 11V7a4 4 0 0 1 8 0v4" />
             </svg>
             <svg x-show="vaultState === 'unlocked'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--color-success)">
+              viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="text-success">
               <rect x="4" y="11" width="16" height="10" rx="2" />
               <path d="M8 11V7a4 4 0 0 1 7.5-2" />
             </svg>
             <span x-text="vaultLabel"></span>
           </button>
-          <button @click="toggleLang()" class="btn-secondary text-[11px] px-2.5 py-1 rounded-md"
-            x-text="lang === 'it' ? 'EN' : 'IT'"></button>
+          <div class="global-preferences">
+            <button type="button" class="pref-btn pref-btn-lang" @click="toggleLang()"
+              :title="lang === 'it' ? t.switchToEnglish : t.switchToItalian"
+              :aria-label="lang === 'it' ? t.switchToEnglish : t.switchToItalian"
+              x-text="lang === 'it' ? 'EN' : 'IT'"></button>
+            <button type="button" class="pref-btn" @click="toggleTheme()"
+              :title="theme === 'dark' ? t.activateLightTheme : t.activateDarkTheme"
+              :aria-label="theme === 'dark' ? t.activateLightTheme : t.activateDarkTheme">
+              <svg x-show="theme === 'light'" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+              <svg x-show="theme === 'dark'" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -90,7 +109,7 @@
     <div class="flex items-center gap-2 mb-3 flex-wrap">
       <input type="text" x-model="searchText" :placeholder="t.search" class="field-input flex-1 min-w-40" />
       <button @click="view = 'tree'" :class="view === 'tree' ? 'btn-primary' : 'btn-secondary'"
-        class="gap-1.5 text-[11px] px-3">
+        class="gap-1.5 text-sm px-3">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <path d="M3 3h4v4H3zM3 10h4v4H3zM3 17h4v4H3zM10 4h11M10 12h11M10 20h11" />
@@ -98,7 +117,7 @@
         <span x-text="t.treeView"></span>
       </button>
       <button @click="view = 'table'" :class="view === 'table' ? 'btn-primary' : 'btn-secondary'"
-        class="gap-1.5 text-[11px] px-3">
+        class="gap-1.5 text-sm px-3">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -108,15 +127,13 @@
         </svg>
         <span x-text="t.tableView"></span>
       </button>
-      <button @click="toggleCheckAll()" class="btn-secondary gap-1.5 text-[11px] px-3"
-        :disabled="filteredConnections.length === 0"
-        :style="filteredConnections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <button @click="toggleCheckAll()" class="btn-secondary gap-1.5 text-sm px-3"
+        :disabled="filteredConnections.length === 0">
         <span x-text="allCheck === 'all' ? t.deselectAll : t.selectAll"></span>
       </button>
       <template x-if="view === 'tree'">
-        <button @click="toggleAll()" class="btn-secondary gap-1.5 text-[11px] px-3"
-          :disabled="filteredConnections.length === 0"
-          :style="filteredConnections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+        <button @click="toggleAll()" class="btn-secondary gap-1.5 text-sm px-3"
+          :disabled="filteredConnections.length === 0">
           <svg x-show="!allExpanded" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
             viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <polyline points="15 3 21 3 21 9" />
@@ -138,7 +155,7 @@
     <!-- Main card -->
     <div class="card mb-3 overflow-hidden">
       <!-- TREE VIEW -->
-      <div x-show="view === 'tree'" class="overflow-y-auto" style="max-height:420px">
+      <div x-show="view === 'tree'" class="connection-list">
         <template x-if="connections.length === 0">
           <div class="empty-state" x-text="t.noConnections"></div>
         </template>
@@ -152,25 +169,25 @@
 <input type="checkbox" class="row-check" :checked="nodeCheck(n0) === 'all'" x-effect="$el.indeterminate = nodeCheck(n0) === 'some'" @click.stop="toggleNodeCheck(n0)" @dblclick.stop />
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="none" viewBox="0 0 24 24"
                 stroke="currentColor" stroke-width="2.5"
-                :style="isNodeExpanded(n0.path) ? '' : 'transform:rotate(-90deg)'" style="transition:transform 0.15s">
+                class="tree-toggle-icon" :class="{ 'is-collapsed': !isNodeExpanded(n0.path) }">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
               <span x-text="n0.name"></span>
-              <span style="opacity:0.5" x-text="'(' + countHosts(n0) + ')'"></span>
+              <span class="tree-count" x-text="'(' + countHosts(n0) + ')'"></span>
             </div>
             <div x-show="isNodeExpanded(n0.path)">
               <!-- Hosts at depth 0 -->
               <template x-for="conn in n0.hosts" :key="conn.id">
-                <div class="conn-row pl-8" :class="{ selected: isSelected(conn) }" @click="selectConn(conn)"
+                <div class="conn-row tree-depth-0" :class="{ selected: isSelected(conn) }" @click="selectConn(conn)"
                   @dblclick="onRowDblClick(conn)">
                   <input type="checkbox" class="row-check" :checked="isChecked(conn)" @click.stop="toggleChecked(conn)" @dblclick.stop />
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.45">
+                    stroke="currentColor" stroke-width="2" class="connection-icon">
                     <polyline points="4 17 10 11 4 5" />
                     <line x1="12" y1="19" x2="20" y2="19" />
                   </svg>
-                  <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
-                  <span class="text-[11px]" style="color:var(--color-muted)" x-text="conn.server"></span>
+                  <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="password-icon" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
+                  <span class="text-sm text-muted" x-text="conn.server"></span>
                   <template x-if="conn.labels">
                     <div class="flex gap-1 flex-wrap ml-1">
                       <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
@@ -183,30 +200,29 @@
               <!-- Depth 1 -->
               <template x-for="n1 in n0.children" :key="n1.path">
                 <div>
-                  <div class="tree-group-label" style="padding-left:1.5rem" @click="toggleNode(n1.path)">
+                  <div class="tree-group-label tree-depth-1" @click="toggleNode(n1.path)">
 <input type="checkbox" class="row-check" :checked="nodeCheck(n1) === 'all'" x-effect="$el.indeterminate = nodeCheck(n1) === 'some'" @click.stop="toggleNodeCheck(n1)" @dblclick.stop />
                     <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="none" viewBox="0 0 24 24"
                       stroke="currentColor" stroke-width="2.5"
-                      :style="isNodeExpanded(n1.path) ? '' : 'transform:rotate(-90deg)'"
-                      style="transition:transform 0.15s">
+                      class="tree-toggle-icon" :class="{ 'is-collapsed': !isNodeExpanded(n1.path) }">
                       <polyline points="6 9 12 15 18 9" />
                     </svg>
                     <span x-text="n1.name"></span>
-                    <span style="opacity:0.5" x-text="'(' + countHosts(n1) + ')'"></span>
+                    <span class="tree-count" x-text="'(' + countHosts(n1) + ')'"></span>
                   </div>
                   <div x-show="isNodeExpanded(n1.path)">
                     <!-- Hosts at depth 1 -->
                     <template x-for="conn in n1.hosts" :key="conn.id">
-                      <div class="conn-row" style="padding-left:3rem" :class="{ selected: isSelected(conn) }"
+                      <div class="conn-row tree-depth-1" :class="{ selected: isSelected(conn) }"
                         @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
                   <input type="checkbox" class="row-check" :checked="isChecked(conn)" @click.stop="toggleChecked(conn)" @dblclick.stop />
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-                          stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.45">
+                          stroke="currentColor" stroke-width="2" class="connection-icon">
                           <polyline points="4 17 10 11 4 5" />
                           <line x1="12" y1="19" x2="20" y2="19" />
                         </svg>
-                        <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
-                        <span class="text-[11px]" style="color:var(--color-muted)" x-text="conn.server"></span>
+                        <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="password-icon" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
+                        <span class="text-sm text-muted" x-text="conn.server"></span>
                         <template x-if="conn.labels">
                           <div class="flex gap-1 flex-wrap ml-1">
                             <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
@@ -219,31 +235,30 @@
                     <!-- Depth 2 -->
                     <template x-for="n2 in n1.children" :key="n2.path">
                       <div>
-                        <div class="tree-group-label" style="padding-left:2.75rem" @click="toggleNode(n2.path)">
+                        <div class="tree-group-label tree-depth-2" @click="toggleNode(n2.path)">
 <input type="checkbox" class="row-check" :checked="nodeCheck(n2) === 'all'" x-effect="$el.indeterminate = nodeCheck(n2) === 'some'" @click.stop="toggleNodeCheck(n2)" @dblclick.stop />
                           <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" stroke-width="2.5"
-                            :style="isNodeExpanded(n2.path) ? '' : 'transform:rotate(-90deg)'"
-                            style="transition:transform 0.15s">
+                            class="tree-toggle-icon" :class="{ 'is-collapsed': !isNodeExpanded(n2.path) }">
                             <polyline points="6 9 12 15 18 9" />
                           </svg>
                           <span x-text="n2.name"></span>
-                          <span style="opacity:0.5" x-text="'(' + countHosts(n2) + ')'"></span>
+                          <span class="tree-count" x-text="'(' + countHosts(n2) + ')'"></span>
                         </div>
                         <div x-show="isNodeExpanded(n2.path)">
                           <!-- Hosts at depth 2 -->
                           <template x-for="conn in n2.hosts" :key="conn.id">
-                            <div class="conn-row" style="padding-left:4.5rem" :class="{ selected: isSelected(conn) }"
+                            <div class="conn-row tree-depth-2" :class="{ selected: isSelected(conn) }"
                               @click="selectConn(conn)" @dblclick="onRowDblClick(conn)">
                   <input type="checkbox" class="row-check" :checked="isChecked(conn)" @click.stop="toggleChecked(conn)" @dblclick.stop />
                               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
                                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-                                style="flex-shrink:0;opacity:0.45">
+                                class="connection-icon">
                                 <polyline points="4 17 10 11 4 5" />
                                 <line x1="12" y1="19" x2="20" y2="19" />
                               </svg>
-                              <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
-                              <span class="text-[11px]" style="color:var(--color-muted)" x-text="conn.server"></span>
+                              <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="password-icon" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
+                              <span class="text-sm text-muted" x-text="conn.server"></span>
                               <template x-if="conn.labels">
                                 <div class="flex gap-1 flex-wrap ml-1">
                                   <template x-for="tag in conn.labels.split(' ').filter(Boolean)" :key="tag">
@@ -256,31 +271,30 @@
                           <!-- Depth 3 -->
                           <template x-for="n3 in n2.children" :key="n3.path">
                             <div>
-                              <div class="tree-group-label" style="padding-left:4.25rem" @click="toggleNode(n3.path)">
+                              <div class="tree-group-label tree-depth-3" @click="toggleNode(n3.path)">
 <input type="checkbox" class="row-check" :checked="nodeCheck(n3) === 'all'" x-effect="$el.indeterminate = nodeCheck(n3) === 'some'" @click.stop="toggleNodeCheck(n3)" @dblclick.stop />
                                 <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" fill="none"
                                   viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"
-                                  :style="isNodeExpanded(n3.path) ? '' : 'transform:rotate(-90deg)'"
-                                  style="transition:transform 0.15s">
+                                  class="tree-toggle-icon" :class="{ 'is-collapsed': !isNodeExpanded(n3.path) }">
                                   <polyline points="6 9 12 15 18 9" />
                                 </svg>
                                 <span x-text="n3.name"></span>
-                                <span style="opacity:0.5" x-text="'(' + countHosts(n3) + ')'"></span>
+                                <span class="tree-count" x-text="'(' + countHosts(n3) + ')'"></span>
                               </div>
                               <div x-show="isNodeExpanded(n3.path)">
                                 <template x-for="conn in n3.hosts" :key="conn.id">
-                                  <div class="conn-row" style="padding-left:6rem"
+                                  <div class="conn-row tree-depth-3"
                                     :class="{ selected: isSelected(conn) }" @click="selectConn(conn)"
                                     @dblclick="onRowDblClick(conn)">
                   <input type="checkbox" class="row-check" :checked="isChecked(conn)" @click.stop="toggleChecked(conn)" @dblclick.stop />
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
                                       viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-                                      style="flex-shrink:0;opacity:0.45">
+                                      class="connection-icon">
                                       <polyline points="4 17 10 11 4 5" />
                                       <line x1="12" y1="19" x2="20" y2="19" />
                                     </svg>
-                                    <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
-                                    <span class="text-[11px]" style="color:var(--color-muted)"
+                                    <span class="flex-1 truncate font-medium" x-text="conn.name"></span><svg x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="password-icon" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg>
+                                    <span class="text-sm text-muted"
                                       x-text="conn.server"></span>
                                     <template x-if="conn.labels">
                                       <div class="flex gap-1 flex-wrap ml-1">
@@ -305,7 +319,7 @@
         </template>
       </div>
       <!-- TABLE VIEW -->
-      <div x-show="view === 'table'" class="overflow-x-auto overflow-y-auto" style="max-height:420px">
+      <div x-show="view === 'table'" class="connection-list overflow-x-auto">
         <template x-if="connections.length === 0">
           <div class="empty-state" x-text="t.noConnections"></div>
         </template>
@@ -316,7 +330,7 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width:2rem">
+                <th class="table-check-column">
                   <input type="checkbox" class="row-check" :checked="allCheck === 'all'"
                     x-effect="$el.indeterminate = allCheck === 'some'" @click.stop="toggleCheckAll()" />
                 </th>
@@ -334,7 +348,7 @@
                   <td @click.stop @dblclick.stop>
                     <input type="checkbox" class="row-check" :checked="isChecked(conn)" @click.stop="toggleChecked(conn)" />
                   </td>
-                  <td class="font-medium"><span x-text="conn.name"></span><svg class="inline-block ml-1" x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.5" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg></td>
+                  <td class="font-medium"><span x-text="conn.name"></span><svg class="password-icon inline-block ml-1" x-show="conn.passwordEnc" xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" :title="t.passwordSaved"><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2" /></svg></td>
                   <td x-text="conn.server"></td>
                   <td x-text="conn.port"></td>
                   <td x-text="conn.username"></td>
@@ -357,8 +371,8 @@
     <div x-show="checkedCount > 0" class="bulk-bar">
       <span x-text="t.bulkSelected(checkedCount)"></span>
       <div class="flex gap-2">
-        <button @click="openBulk()" class="btn-primary text-[11px]" x-text="t.bulkChange"></button>
-        <button @click="clearChecked()" class="btn-secondary text-[11px]" x-text="t.bulkClear"></button>
+        <button @click="openBulk()" class="btn-primary text-sm" x-text="t.bulkChange"></button>
+        <button @click="clearChecked()" class="btn-secondary text-sm" x-text="t.bulkClear"></button>
       </div>
     </div>
     <!-- Details bar -->
@@ -373,8 +387,7 @@
         </svg>
         <span x-text="t.addConnection"></span>
       </button>
-      <button @click="connectSelected()" class="btn-secondary gap-1.5" :disabled="!selectedConn"
-        :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <button @click="connectSelected()" class="btn-secondary gap-1.5" :disabled="!selectedConn">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <polyline points="4 17 10 11 4 5" />
@@ -383,7 +396,7 @@
         <span x-text="t.connect"></span>
       </button>
       <button @click="connectExternalSelected()" class="btn-secondary gap-1.5" :title="t.connectExternalHint"
-        :disabled="!selectedConn" :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+        :disabled="!selectedConn">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -400,8 +413,7 @@
         </svg>
         <span x-text="t.connectLocal"></span>
       </button>
-      <button @click="openEditModal(selectedConn)" class="btn-secondary gap-1.5" :disabled="!selectedConn"
-        :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <button @click="openEditModal(selectedConn)" class="btn-secondary gap-1.5" :disabled="!selectedConn">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -409,8 +421,7 @@
         </svg>
         <span x-text="t.edit"></span>
       </button>
-      <button @click="deleteSelected()" class="btn-danger gap-1.5" :disabled="!selectedConn"
-        :style="!selectedConn ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <button @click="deleteSelected()" class="btn-danger gap-1.5" :disabled="!selectedConn">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <polyline points="3 6 5 6 21 6" />
@@ -420,8 +431,7 @@
         </svg>
         <span x-text="t.delete"></span>
       </button>
-      <button @click="deleteAll()" class="btn-danger gap-1.5" :disabled="connections.length === 0"
-        :style="connections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <button @click="deleteAll()" class="btn-danger gap-1.5" :disabled="connections.length === 0">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <polyline points="3 6 5 6 21 6" />
@@ -443,8 +453,7 @@
         </svg>
         <span x-text="t.importCsv"></span>
       </button>
-      <button @click="exportCSV()" class="btn-secondary gap-1.5" :disabled="connections.length === 0"
-        :style="connections.length === 0 ? 'opacity:0.4;cursor:not-allowed' : ''">
+      <button @click="exportCSV()" class="btn-secondary gap-1.5" :disabled="connections.length === 0">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -463,12 +472,9 @@
         <span x-text="t.help"></span>
       </button>
     </div>
-    <!-- Footer -->
-    <div class="divider pt-5 flex items-center justify-center text-[11px] mt-6">
-      <span style="opacity:0.7;color:var(--color-muted)" x-text="t.madeWith"></span>
-      <a href="https://claude.ai" target="_blank" rel="noopener" class="footer-link ml-1">Claude</a>
-      <span style="opacity:0.7;color:var(--color-muted)" class="ml-1">(Anthropic)</span>
-    </div>
+  </div>
+  <div class="app-footer">
+    <span class="text-xs text-subtle" x-text="t.madeWith"></span>
   </div>
   </div>
   <!-- TERMINAL AREA (one pane per tab, kept mounted to preserve scrollback) -->
@@ -482,39 +488,39 @@
     <div class="modal-box">
       <div class="flex items-center justify-between mb-5">
         <span class="font-medium" x-text="isEditing ? t.editConnectionTitle : t.addConnectionTitle"></span>
-        <button @click="closeAddModal()" class="btn-secondary px-2 py-1 text-[11px]">✕</button>
+        <button @click="closeAddModal()" class="btn-secondary px-2 py-1 text-sm">✕</button>
       </div>
       <div class="flex flex-col gap-3">
         <div>
           <label class="label mb-1" x-text="t.fieldName"></label>
           <input class="field-input" type="text" x-model="form.name" />
-          <span x-show="formErrors.name" class="text-[11px]" style="color:var(--color-danger)"
+          <span x-show="formErrors.name" class="text-sm text-danger"
             x-text="formErrors.name"></span>
         </div>
         <div class="flex gap-2">
           <div class="flex-1">
             <label class="label mb-1" x-text="t.fieldServer"></label>
             <input class="field-input" type="text" x-model="form.server" placeholder="10.0.1.10" />
-            <span x-show="formErrors.server" class="text-[11px]" style="color:var(--color-danger)"
+            <span x-show="formErrors.server" class="text-sm text-danger"
               x-text="formErrors.server"></span>
           </div>
-          <div style="width:80px">
+          <div class="port-field">
             <label class="label mb-1" x-text="t.fieldPort"></label>
             <input class="field-input" type="text" x-model="form.port" placeholder="22" />
-            <span x-show="formErrors.port" class="text-[11px]" style="color:var(--color-danger)"
+            <span x-show="formErrors.port" class="text-sm text-danger"
               x-text="formErrors.port"></span>
           </div>
         </div>
         <div>
           <label class="label mb-1" x-text="t.fieldUsername"></label>
           <input class="field-input" type="text" x-model="form.username" placeholder="ubuntu" />
-          <span x-show="formErrors.username" class="text-[11px]" style="color:var(--color-danger)"
+          <span x-show="formErrors.username" class="text-sm text-danger"
             x-text="formErrors.username"></span>
         </div>
         <div>
           <label class="label mb-1" x-text="t.fieldGroup"></label>
           <input class="field-input" type="text" x-model="form.group" :placeholder="t.fieldGroupHint" />
-          <span x-show="formErrors.group" class="text-[11px]" style="color:var(--color-danger)"
+          <span x-show="formErrors.group" class="text-sm text-danger"
             x-text="formErrors.group"></span>
         </div>
         <div>
@@ -527,15 +533,14 @@
             <div>
               <input class="field-input" type="password" autocomplete="new-password" x-model="form.password"
                 :placeholder="(form.passwordEnc && !form.removePassword) ? t.passwordKeepPlaceholder : t.passwordOptional" />
-              <label x-show="form.passwordEnc" class="flex items-center gap-2 mt-1.5 text-[11px] cursor-pointer"
-                style="color:var(--color-muted)">
-                <input type="checkbox" class="row-check" style="margin-right:0" x-model="form.removePassword" />
+              <label x-show="form.passwordEnc" class="flex items-center gap-2 mt-1.5 text-sm text-muted cursor-pointer">
+                <input type="checkbox" class="row-check password-remove-check" x-model="form.removePassword" />
                 <span x-text="t.passwordRemove"></span>
               </label>
             </div>
           </template>
           <template x-if="vaultState !== 'unlocked'">
-            <div class="text-[11px]" style="color:var(--color-muted)">
+            <div class="text-sm text-muted">
               <span x-text="vaultState === 'none' ? t.passwordNeedsCreate : t.passwordNeedsUnlock"></span>
               <button type="button" class="footer-link ml-1" @click="openVaultFromForm()"
                 x-text="vaultState === 'none' ? t.vaultCreateBtn : t.vaultUnlockBtn"></button>
@@ -551,12 +556,12 @@
   </div>
   <!-- VAULT MODAL (create / unlock master password) -->
   <div x-show="showVaultModal" class="modal-overlay" @click.self="closeVaultModal()">
-    <div class="modal-box" style="max-width:400px" @keydown.escape="closeVaultModal()">
+    <div class="modal-box modal-box-compact" @keydown.escape="closeVaultModal()">
       <div class="flex items-center justify-between mb-3">
         <span class="font-medium" x-text="vaultMode === 'create' ? t.vaultCreateTitle : t.vaultUnlockTitle"></span>
-        <button @click="closeVaultModal()" class="btn-secondary px-2 py-1 text-[11px]">✕</button>
+        <button @click="closeVaultModal()" class="btn-secondary px-2 py-1 text-sm">✕</button>
       </div>
-      <div class="text-[11px] mb-4" style="color:var(--color-muted);line-height:1.5"
+      <div class="text-sm text-muted vault-hint mb-4"
         x-text="vaultMode === 'create' ? t.vaultCreateHint : t.vaultUnlockHint"></div>
       <div class="flex flex-col gap-3">
         <div>
@@ -569,10 +574,10 @@
           <input class="field-input" type="password" x-model="vaultForm.confirm" autocomplete="off"
             @keydown.enter="submitVault()" />
         </div>
-        <span x-show="vaultError" class="text-[11px]" style="color:var(--color-danger)" x-text="vaultError"></span>
+        <span x-show="vaultError" class="text-sm text-danger" x-text="vaultError"></span>
       </div>
       <div class="flex items-center justify-between gap-2 mt-5">
-        <button x-show="vaultMode === 'unlock'" type="button" class="footer-link text-[11px]"
+        <button x-show="vaultMode === 'unlock'" type="button" class="footer-link text-sm"
           @click="vaultResetStep = 1" x-text="t.vaultForgot"></button>
         <span x-show="vaultMode !== 'unlock'"></span>
         <div class="flex gap-2">
@@ -581,28 +586,28 @@
             x-text="vaultMode === 'create' ? t.vaultCreateBtn : t.vaultUnlockBtn"></button>
         </div>
       </div>
-      <div x-show="vaultResetStep === 1" class="mt-4 pt-4" style="border-top:1px solid var(--color-border)">
-        <div class="text-[11px] mb-3" style="color:var(--color-muted)" x-text="t.vaultResetMsg"></div>
-        <button @click="resetVault()" class="btn-danger text-[11px]" x-text="t.vaultResetBtn"></button>
+      <div x-show="vaultResetStep === 1" class="vault-reset-section mt-4 pt-4">
+        <div class="text-sm text-muted mb-3" x-text="t.vaultResetMsg"></div>
+        <button @click="resetVault()" class="btn-danger text-sm" x-text="t.vaultResetBtn"></button>
       </div>
     </div>
   </div>
   <!-- BULK PASSWORD MODAL -->
   <div x-show="showBulkModal" class="modal-overlay" @click.self="closeBulk()">
-    <div class="modal-box" style="max-width:440px" @keydown.escape="closeBulk()">
+    <div class="modal-box" @keydown.escape="closeBulk()">
       <div class="flex items-center justify-between mb-3">
         <span class="font-medium" x-text="t.bulkTitle(checkedCount)"></span>
-        <button @click="closeBulk()" class="btn-secondary px-2 py-1 text-[11px]">✕</button>
+        <button @click="closeBulk()" class="btn-secondary px-2 py-1 text-sm">✕</button>
       </div>
-      <div class="text-[11px] mb-1" style="color:var(--color-muted)" x-text="bulkSummary"></div>
-      <div class="text-[11px] mb-4" style="color:var(--color-muted);opacity:0.8" x-text="t.bulkNote"></div>
+      <div class="text-sm text-muted mb-1" x-text="bulkSummary"></div>
+      <div class="text-sm text-muted-soft mb-4" x-text="t.bulkNote"></div>
       <div class="flex flex-col gap-3">
         <div>
           <label class="label mb-1" x-text="t.bulkNew"></label>
           <div class="flex gap-2">
             <input class="field-input" :type="bulkForm.show ? 'text' : 'password'" x-model="bulkForm.password"
               autocomplete="new-password" @keydown.enter="applyBulk()" />
-            <button type="button" class="btn-secondary text-[11px] px-3" @click="bulkForm.show = !bulkForm.show"
+            <button type="button" class="btn-secondary text-sm px-3" @click="bulkForm.show = !bulkForm.show"
               x-text="bulkForm.show ? t.bulkHide : t.bulkShow"></button>
           </div>
         </div>
@@ -611,10 +616,10 @@
           <input class="field-input" :type="bulkForm.show ? 'text' : 'password'" x-model="bulkForm.confirm"
             autocomplete="new-password" @keydown.enter="applyBulk()" />
         </div>
-        <span x-show="bulkError" class="text-[11px]" style="color:var(--color-danger)" x-text="bulkError"></span>
+        <span x-show="bulkError" class="text-sm text-danger" x-text="bulkError"></span>
       </div>
       <div class="flex items-center justify-between gap-2 mt-5">
-        <button type="button" class="btn-danger text-[11px]" @click="removeBulk()" x-text="t.bulkRemove"></button>
+        <button type="button" class="btn-danger text-sm" @click="removeBulk()" x-text="t.bulkRemove"></button>
         <div class="flex gap-2">
           <button @click="closeBulk()" class="btn-secondary" x-text="t.cancel"></button>
           <button @click="applyBulk()" class="btn-primary" :disabled="bulkBusy" x-text="t.bulkApply"></button>
@@ -626,7 +631,7 @@
   <div x-show="showConfirmDelete" class="modal-overlay" @click.self="showConfirmDelete = false">
     <div class="confirm-dialog">
       <div class="font-medium mb-2" x-text="t.confirmDeleteTitle"></div>
-      <div class="text-[12px] mb-5" style="color:var(--color-muted)"
+      <div class="text-sm text-muted mb-5"
         x-text="selectedConn ? t.confirmDeleteMsg(selectedConn.name) : ''"></div>
       <div class="flex justify-end gap-2">
         <button @click="showConfirmDelete = false" class="btn-secondary" x-text="t.confirmNo"></button>
@@ -638,7 +643,7 @@
   <div x-show="showConfirmDeleteAll" class="modal-overlay" @click.self="showConfirmDeleteAll = false">
     <div class="confirm-dialog">
       <div class="font-medium mb-2" x-text="t.confirmDeleteAllTitle"></div>
-      <div class="text-[12px] mb-5" style="color:var(--color-muted)" x-text="t.confirmDeleteAllMsg(connections.length)">
+      <div class="text-sm text-muted mb-5" x-text="t.confirmDeleteAllMsg(connections.length)">
       </div>
       <div class="flex justify-end gap-2">
         <button @click="showConfirmDeleteAll = false" class="btn-secondary" x-text="t.confirmNo"></button>
@@ -648,22 +653,21 @@
   </div>
   <!-- HELP MODAL -->
   <div x-show="showHelp" class="modal-overlay" @click.self="showHelp = false">
-    <div class="modal-box" style="max-width:560px">
+    <div class="modal-box modal-box-wide">
       <div class="flex items-center justify-between mb-4">
         <span class="font-medium" x-text="t.helpTitle"></span>
-        <button @click="showHelp = false" class="btn-secondary px-2 py-1 text-[11px]">✕</button>
+        <button @click="showHelp = false" class="btn-secondary px-2 py-1 text-sm">✕</button>
       </div>
-      <pre class="text-[11px] overflow-auto"
-        style="color:var(--color-muted);max-height:400px;white-space:pre-wrap;line-height:1.6" x-text="helpText"></pre>
+      <pre class="help-text text-sm text-muted overflow-auto" x-text="helpText"></pre>
       <div class="flex justify-end mt-4">
         <button @click="showHelp = false" class="btn-secondary" x-text="t.helpClose"></button>
       </div>
     </div>
   </div>
   <!-- TOAST -->
-  <div x-show="toast" x-transition style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:100;pointer-events:none">
-    <div class="card px-4 py-2.5 text-[12px]"
-      :style="toast?.isError ? 'color:var(--color-danger)' : 'color:var(--color-success)'">
+  <div x-show="toast" x-transition class="toast">
+    <div class="card px-4 py-2.5 text-sm"
+      :class="toast?.isError ? 'toast-error' : 'toast-success'">
       <span x-text="toast?.msg"></span>
     </div>
   </div>

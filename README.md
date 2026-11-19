@@ -6,28 +6,7 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 
 ## Screenshot
 
-### Table mode
-
-![image](./assets/screenshots/connection-manager-table.png)
-
-### Tree mode
-
-![image](./assets/screenshots/connection-manager-tree.png)
-
-### Terminal tabs
-
-<!-- TODO screenshot: 2-3 open tabs with status dots, one session running something colourful (ls --color, htop). Fake hosts only. Replace assets/screenshots/connection-manager-tabs.png -->
-![Terminal tabs](./assets/screenshots/connection-manager-tabs.png)
-
-### Bulk selection
-
-<!-- TODO screenshot: search field filled (e.g. by username), several rows ticked, "N selected" bar visible. Replace assets/screenshots/connection-manager-bulk.png -->
-![Bulk selection](./assets/screenshots/connection-manager-bulk.png)
-
-### Bulk password change
-
-<!-- TODO screenshot (optional, delete this section if you skip it): the "Change password for N connections" dialog, no real password. Replace assets/screenshots/connection-manager-bulk-dialog.png -->
-![Bulk password change](./assets/screenshots/connection-manager-bulk-dialog.png)
+![image](./assets/screenshots/connection-manager.png)
 
 ---
 
@@ -108,13 +87,13 @@ curl -fsSL https://github.com/gsandrini/connection-manager/releases/latest/downl
 - [creack/pty](https://github.com/creack/pty) - PTY for the SSH sessions
 - [Alpine.js](https://alpinejs.dev) - Reactive UI (bundled locally)
 - [Tailwind CSS](https://tailwindcss.com) - Styling (compiled locally)
-- [JetBrains Mono](https://www.jetbrains.com/lp/mono/) - Typography
+- [Google Fonts](https://fonts.google.com) - Inter and JetBrains Mono typography (loaded from CDN)
 
 ---
 
 ## Built with
 
-This project was built with the support of [Claude](https://claude.ai) by Anthropic.
+This project was built with the support of AI.
 
 ---
 

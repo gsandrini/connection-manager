@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,35 +19,28 @@ type App struct {
 	vault *vault
 }
 
-// translations holds all UI strings per language
+// Errors that can reach the user. Errors stay language-agnostic: the
+// frontend maps these exact messages to translated text (BACKEND_ERRORS in
+// app.js) and falls back to the raw message for anything it does not know.
+var (
+	errInvalidTarget = errors.New("invalid username or server")
+	errNoSSH         = errors.New("ssh command not found in PATH")
+	errNoShell       = errors.New("no shell found")
+)
+
+// translations holds the strings the backend shows by itself (native dialogs)
 var translations = map[string]map[string]string{
 	"it": {
-		"noTerminal":    "Nessun emulatore di terminale trovato.",
-		"unsupportedOS": "Sistema operativo non supportato: ",
-		"noSSH":         "Comando ssh non trovato nel PATH.",
-		"noShell":       "Nessuna shell trovata.",
-		"invalidTarget": "Utente o server non validi.",
+		"exportCSVTitle": "Esporta connessioni in CSV",
+		"csvFiles":       "File CSV (*.csv)",
 	},
 	"en": {
-		"noTerminal":    "No terminal emulator found.",
-		"unsupportedOS": "Unsupported OS: ",
-		"noSSH":         "ssh command not found in PATH.",
-		"noShell":       "No shell found.",
-		"invalidTarget": "Invalid username or server.",
+		"exportCSVTitle": "Export CSV connections",
+		"csvFiles":       "CSV Files (*.csv)",
 	},
 }
 
-// NewApp creates a new App application struct
-func NewApp() *App {
-	return &App{terms: newTermManager(), vault: newVault()}
-}
-
-// startup is called when the app starts
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
-}
-
-// SetLanguage sets the active language for backend messages
+// SetLanguage sets the active language for backend dialogs
 func (a *App) SetLanguage(lang string) {
 	if _, ok := translations[lang]; ok {
 		a.lang = lang
@@ -60,15 +54,31 @@ func (a *App) t(key string) string {
 			return val
 		}
 	}
+	// fallback to italian
+	if msgs, ok := translations["it"]; ok {
+		if val, ok := msgs[key]; ok {
+			return val
+		}
+	}
 	return key
+}
+
+// NewApp creates a new App application struct
+func NewApp() *App {
+	return &App{lang: "it", terms: newTermManager(), vault: newVault()}
+}
+
+// startup is called when the app starts
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
 }
 
 func (a *App) SaveCSV(content string) error {
 	path, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
-		Title:           "Export CSV connections",
+		Title:           a.t("exportCSVTitle"),
 		DefaultFilename: "connection-manager-export.csv",
 		Filters: []wailsRuntime.FileFilter{
-			{DisplayName: "CSV Files (*.csv)", Pattern: "*.csv"},
+			{DisplayName: a.t("csvFiles"), Pattern: "*.csv"},
 		},
 	})
 	if err != nil {
@@ -106,10 +116,10 @@ func (a *App) OpenSSH(username, server string, port int) error {
 			}
 		}
 		if cmd == nil {
-			return fmt.Errorf("%s", a.t("noTerminal"))
+			return errors.New("no terminal emulator found")
 		}
 	default:
-		return fmt.Errorf("%s%s", a.t("unsupportedOS"), runtime.GOOS)
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 
 	return cmd.Start()

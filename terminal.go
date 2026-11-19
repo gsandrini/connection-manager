@@ -67,7 +67,7 @@ func validSSHField(v string) bool {
 // this very user@host. It never reaches the frontend.
 func (a *App) OpenTerminal(id, username, server string, port, cols, rows int, passwordEnc string) error {
 	if !validSSHField(id) || !validSSHField(username) || !validSSHField(server) {
-		return errors.New(a.t("invalidTarget"))
+		return errInvalidTarget
 	}
 	if port <= 0 || port > 65535 {
 		port = 22
@@ -81,7 +81,7 @@ func (a *App) OpenTerminal(id, username, server string, port, cols, rows int, pa
 
 	sshBin, err := exec.LookPath("ssh")
 	if err != nil {
-		return errors.New(a.t("noSSH"))
+		return errNoSSH
 	}
 
 	a.terms.mu.Lock()
@@ -111,7 +111,7 @@ func (a *App) OpenTerminal(id, username, server string, port, cols, rows int, pa
 // ResizeTerminal / CloseTerminal calls as the ssh sessions.
 func (a *App) OpenLocalTerminal(id string, cols, rows int) error {
 	if !validSSHField(id) {
-		return errors.New(a.t("invalidTarget"))
+		return errInvalidTarget
 	}
 	if cols <= 0 {
 		cols = 80
@@ -131,7 +131,7 @@ func (a *App) OpenLocalTerminal(id string, cols, rows int) error {
 		}
 	}
 	if shell == "" {
-		return errors.New(a.t("noShell"))
+		return errNoShell
 	}
 
 	var args []string

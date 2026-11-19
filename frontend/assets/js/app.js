@@ -2,6 +2,8 @@
 
 const STORAGE_KEY = 'connection-manager-connections';
 const VAULT_KEY = 'connection-manager-vault';
+const PREF_KEYS = { language: 'language', theme: 'theme' };
+const THEME_COLORS = { light: '#f7f7f4', dark: '#181a1f' };
 
 // Stable identifier for a connection (name+server is not unique)
 function newId() {
@@ -57,7 +59,11 @@ const TRANSLATIONS = {
     csvImportError: 'Errore durante l\'importazione del CSV.',
     exportCsv: 'Esporta CSV',
     csvExportSuccess: (n) => `${n} connessioni esportate.`,
+    csvExportError: 'Errore durante l\'esportazione del CSV.',
     connectError: 'Impossibile aprire il terminale.',
+    errInvalidTarget: 'Utente o server non validi.',
+    errNoSSH: 'Comando ssh non trovato nel PATH.',
+    errNoShell: 'Nessuna shell trovata.',
     tabHome: 'Connessioni',
     localTab: 'Locale',
     connectLocal: 'Locale',
@@ -77,7 +83,7 @@ const TRANSLATIONS = {
     sessionEnded: (code) => `[Sessione terminata (codice ${code}) - premi Invio per riconnetterti]`,
     thName: 'Nome', thServer: 'Server', thPort: 'Porta',
     thUsername: 'Username', thGroup: 'Gruppo', thLabels: 'Labels',
-    madeWith: 'Sviluppata con il supporto di',
+    madeWith: 'Developed with AI assistance',
     // vault
     vaultNone: 'Password', vaultLocked: 'Bloccato', vaultUnlocked: 'Sbloccato',
     vaultBtnNone: 'Configura il salvataggio delle password',
@@ -119,6 +125,10 @@ const TRANSLATIONS = {
     bulkDone: (n) => `Password aggiornata per ${n} connessioni.`,
     bulkRemoved: (n) => `Password rimossa da ${n} connessioni.`,
     bulkNote: 'Cambia solo la password salvata nell\'app, non quella sul server.',
+    switchToItalian: 'Passa a italiano',
+    switchToEnglish: 'Passa a inglese',
+    activateLightTheme: 'Attiva tema chiaro',
+    activateDarkTheme: 'Attiva tema scuro',
   },
   en: {
     title: 'Connection Manager',
@@ -159,7 +169,11 @@ const TRANSLATIONS = {
     csvImportError: 'Error importing CSV.',
     exportCsv: 'Export CSV',
     csvExportSuccess: (n) => `${n} connections exported.`,
+    csvExportError: 'Error exporting CSV.',
     connectError: 'Could not open terminal.',
+    errInvalidTarget: 'Invalid username or server.',
+    errNoSSH: 'ssh command not found in PATH.',
+    errNoShell: 'No shell found.',
     tabHome: 'Connections',
     localTab: 'Local',
     connectLocal: 'Local',
@@ -179,7 +193,7 @@ const TRANSLATIONS = {
     sessionEnded: (code) => `[Session ended (code ${code}) - press Enter to reconnect]`,
     thName: 'Name', thServer: 'Server', thPort: 'Port',
     thUsername: 'Username', thGroup: 'Group', thLabels: 'Labels',
-    madeWith: 'Developed with the support of',
+    madeWith: 'Developed with AI assistance',
     // vault
     vaultNone: 'Passwords', vaultLocked: 'Locked', vaultUnlocked: 'Unlocked',
     vaultBtnNone: 'Set up password saving',
@@ -221,6 +235,10 @@ const TRANSLATIONS = {
     bulkDone: (n) => `Password updated for ${n} connections.`,
     bulkRemoved: (n) => `Password removed from ${n} connections.`,
     bulkNote: 'Only changes the password saved in the app, not the one on the server.',
+    switchToItalian: 'Switch to Italian',
+    switchToEnglish: 'Switch to English',
+    activateLightTheme: 'Activate light theme',
+    activateDarkTheme: 'Activate dark theme',
   },
 };
 
@@ -425,6 +443,14 @@ function b64ToBytes(b64) {
   return out;
 }
 
+// Error messages returned by the Go backend (see app.go) -> translation key.
+// Anything not listed is shown as-is.
+const BACKEND_ERRORS = {
+  'invalid username or server': 'errInvalidTarget',
+  'ssh command not found in PATH': 'errNoSSH',
+  'no shell found': 'errNoShell',
+};
+
 const TERM_THEME = {
   background: '#0f0f0f', foreground: '#e6e6e3', cursor: '#f7f7f5',
   selectionBackground: 'rgba(255,255,255,0.25)',
@@ -526,17 +552,46 @@ function showTermMenu(x, y, items) {
 
 function ConnectionManagerApp() {
   return {
-    lang: navigator.language.startsWith('it') ? 'it' : 'en',
+    // Initial values are resolved once by the inline script in index.html
+    // (before first paint) and read back here.
+    lang: document.documentElement.lang === 'it' ? 'it' : 'en',
+    theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
     get t() {
       return TRANSLATIONS[this.lang];
     },
-    async toggleLang() {
-      this.lang = this.lang === 'it' ? 'en' : 'it';
-      try {
-        await window.go.main.App.SetLanguage(this.lang);
-      } catch (e) {
-        console.error('SetLanguage error:', e);
-      }
+
+    setLanguage(nextLanguage) {
+      if (!Object.prototype.hasOwnProperty.call(TRANSLATIONS, nextLanguage)) return;
+      this.lang = nextLanguage;
+      document.documentElement.lang = nextLanguage;
+      try { localStorage.setItem(PREF_KEYS.language, nextLanguage); } catch (_) {}
+      this.syncBackendLanguage();
+    },
+
+    // Native dialogs shown by the backend (e.g. the CSV export dialog) follow the UI language
+    syncBackendLanguage() {
+      window.go?.main?.App?.SetLanguage(this.lang);
+    },
+
+    toggleLang() {
+      this.setLanguage(this.lang === 'it' ? 'en' : 'it');
+    },
+
+    setTheme(nextTheme) {
+      if (nextTheme !== 'light' && nextTheme !== 'dark') return;
+      this.theme = nextTheme;
+      document.documentElement.dataset.theme = nextTheme;
+      document.querySelector('meta[name="theme-color"]').content = THEME_COLORS[nextTheme];
+      try { localStorage.setItem(PREF_KEYS.theme, nextTheme); } catch (_) {}
+    },
+
+    toggleTheme() {
+      this.setTheme(this.theme === 'dark' ? 'light' : 'dark');
+    },
+    // Translate a backend error (a plain string coming from a rejected Wails call)
+    errText(err) {
+      const msg = String(err);
+      return this.t[BACKEND_ERRORS[msg]] || msg;
     },
 
     connections: [],
@@ -582,17 +637,15 @@ function ConnectionManagerApp() {
     tabSeq: 0,
 
     init() {
+      // lang/theme were already applied by the inline script in index.html;
+      // don't persist them here, so an unset preference keeps following the system
+      this.syncBackendLanguage();
       this.loadConnections();
       this.$watch('searchText', () => {
         this.selectedConn = null;
         this.checked = {};   // selection only ever applies to what is visible
       });
       this.initVault();
-      try {
-        window.go.main.App.SetLanguage(this.lang);
-      } catch (e) {
-        console.error('SetLanguage init error:', e);
-      }
 
       // Refit the active terminal whenever the available area changes size
       const area = document.querySelector('.term-area');
@@ -1197,7 +1250,7 @@ function ConnectionManagerApp() {
         tab.status = 'running';
       } catch (err) {
         tab.status = 'exited';
-        term.write('\r\n\x1b[31m' + err + '\x1b[0m\r\n');
+        term.write('\r\n\x1b[31m' + this.errText(err) + '\x1b[0m\r\n');
         this.showToast(this.t.terminalError, true);
         console.error('OpenTerminal error:', err);
       }
@@ -1285,7 +1338,7 @@ function ConnectionManagerApp() {
         await window.go.main.App.SaveCSV(csv);
         this.showToast(this.t.csvExportSuccess(this.connections.length));
       } catch (err) {
-        this.showToast(this.t.csvExportError ?? 'Export error.', true);
+        this.showToast(this.t.csvExportError, true);
         console.error('SaveCSV error:', err);
       }
     },
