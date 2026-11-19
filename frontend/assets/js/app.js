@@ -77,7 +77,7 @@ const TRANSLATIONS = {
     sessionEnded: (code) => `[Sessione terminata (codice ${code}) - premi Invio per riconnetterti]`,
     thName: 'Nome', thServer: 'Server', thPort: 'Porta',
     thUsername: 'Username', thGroup: 'Gruppo', thLabels: 'Labels',
-    madeWith: 'Sviluppata con il supporto di',
+    madeWith: "Sviluppata con il supporto dell'AI",
     // vault
     vaultNone: 'Password', vaultLocked: 'Bloccato', vaultUnlocked: 'Sbloccato',
     vaultBtnNone: 'Configura il salvataggio delle password',
@@ -179,7 +179,7 @@ const TRANSLATIONS = {
     sessionEnded: (code) => `[Session ended (code ${code}) - press Enter to reconnect]`,
     thName: 'Name', thServer: 'Server', thPort: 'Port',
     thUsername: 'Username', thGroup: 'Group', thLabels: 'Labels',
-    madeWith: 'Developed with the support of',
+    madeWith: 'Developed with AI assistance',
     // vault
     vaultNone: 'Passwords', vaultLocked: 'Locked', vaultUnlocked: 'Unlocked',
     vaultBtnNone: 'Set up password saving',
@@ -526,17 +526,35 @@ function showTermMenu(x, y, items) {
 
 function ConnectionManagerApp() {
   return {
-    lang: navigator.language.startsWith('it') ? 'it' : 'en',
+    lang: (() => {
+      const saved = localStorage.getItem('language');
+      return saved === 'it' || saved === 'en'
+        ? saved
+        : (navigator.language.startsWith('it') ? 'it' : 'en');
+    })(),
+    theme: (() => {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    })(),
     get t() {
       return TRANSLATIONS[this.lang];
     },
     async toggleLang() {
       this.lang = this.lang === 'it' ? 'en' : 'it';
+      document.documentElement.lang = this.lang;
+      localStorage.setItem('language', this.lang);
       try {
         await window.go.main.App.SetLanguage(this.lang);
       } catch (e) {
         console.error('SetLanguage error:', e);
       }
+    },
+
+    toggleTheme() {
+      this.theme = this.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = this.theme;
+      localStorage.setItem('theme', this.theme);
     },
 
     connections: [],
@@ -582,6 +600,7 @@ function ConnectionManagerApp() {
     tabSeq: 0,
 
     init() {
+      document.documentElement.dataset.theme = this.theme;
       this.loadConnections();
       this.$watch('searchText', () => {
         this.selectedConn = null;

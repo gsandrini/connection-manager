@@ -9,6 +9,9 @@ module.exports = {
   darkMode: 'media',
   theme: {
     extend: {
+      fontSize: {
+        sm: '13px',
+      },
       fontFamily: {
         mono: ['"JetBrains Mono"', 'monospace'],
       },
