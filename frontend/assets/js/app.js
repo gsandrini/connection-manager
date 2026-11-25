@@ -2,7 +2,12 @@
 
 const STORAGE_KEY = 'connection-manager-connections';
 const VAULT_KEY = 'connection-manager-vault';
-const PREF_KEYS = { language: 'language', theme: 'theme', fontSize: 'terminalFontSize' };
+const PREF_KEYS = {
+  language: 'language',
+  theme: 'theme',
+  fontSize: 'terminalFontSize',
+  autoCopy: 'terminalCopyOnSelect',
+};
 const THEME_COLORS = { light: '#f7f7f4', dark: '#181a1f' };
 
 // Terminal font size (px): global preference, applied to every terminal tab
@@ -20,6 +25,11 @@ function loadFontSize() {
     if (raw !== null) return clampFontSize(raw);
   } catch (_) { /* storage unavailable: use the default */ }
   return TERM_FONT.def;
+}
+
+// Copy-on-select is opt-in: off unless the user enabled it
+function loadAutoCopy() {
+  try { return localStorage.getItem(PREF_KEYS.autoCopy) === '1'; } catch (_) { return false; }
 }
 
 // Ctrl + / Ctrl - / Ctrl 0  ->  +1 / -1 / 0 (reset). null when it is not a font-size shortcut.
@@ -155,6 +165,8 @@ const TRANSLATIONS = {
     switchToEnglish: 'Passa a inglese',
     activateLightTheme: 'Attiva tema chiaro',
     activateDarkTheme: 'Attiva tema scuro',
+    settingsAutoCopy: 'Copia automaticamente la selezione',
+    settingsAutoCopyHint: 'Il testo selezionato nel terminale viene copiato negli appunti al rilascio del mouse.',
     settings: 'Preferenze',
     settingsTitle: 'Preferenze',
     settingsClose: 'Chiudi',
@@ -274,6 +286,8 @@ const TRANSLATIONS = {
     switchToEnglish: 'Switch to English',
     activateLightTheme: 'Activate light theme',
     activateDarkTheme: 'Activate dark theme',
+    settingsAutoCopy: 'Copy selection automatically',
+    settingsAutoCopyHint: 'Text selected in the terminal is copied to the clipboard when you release the mouse button.',
     settings: 'Preferences',
     settingsTitle: 'Preferences',
     settingsClose: 'Close',
@@ -606,6 +620,7 @@ function ConnectionManagerApp() {
     // Preferences panel (global settings; more sections can be added later)
     showSettings: false,
     termFontSize: loadFontSize(),
+    autoCopySelection: loadAutoCopy(),
     fontMin: TERM_FONT.min,
     fontMax: TERM_FONT.max,
     fontDefault: TERM_FONT.def,
@@ -640,6 +655,12 @@ function ConnectionManagerApp() {
 
     toggleTheme() {
       this.setTheme(this.theme === 'dark' ? 'light' : 'dark');
+    },
+
+    // Copy-on-select: global, read by every terminal at the moment the selection settles
+    setAutoCopySelection(on) {
+      this.autoCopySelection = !!on;
+      try { localStorage.setItem(PREF_KEYS.autoCopy, on ? '1' : '0'); } catch (_) {}
     },
 
     // Global terminal font size: saved, then applied to every open terminal
@@ -1304,6 +1325,34 @@ function ConnectionManagerApp() {
           term.write('\r\n\x1b[2m' + this.t.sessionEnded(code) + '\x1b[0m\r\n');
         }),
       ];
+      // Copy on select (optional): copy once the selection has settled, not while dragging,
+      // so the clipboard never holds half-made selections. An empty selection never
+      // touches the clipboard.
+      let dragging = false;
+      let selTimer = null;
+      const autoCopy = () => {
+        clearTimeout(selTimer);
+        if (!this.autoCopySelection) return;
+        const sel = term.getSelection();
+        if (sel) clipWrite(sel);                    // '' (e.g. double-click on blank cells) is ignored
+      };
+      const onMouseUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        autoCopy();
+      };
+      el.addEventListener('mousedown', (ev) => { if (ev.button === 0) dragging = true; });
+      window.addEventListener('mouseup', onMouseUp);
+      const selSub = term.onSelectionChange(() => {
+        if (dragging) return;                       // mouse still down: wait for the release
+        clearTimeout(selTimer);
+        selTimer = setTimeout(autoCopy, 200);       // keyboard / programmatic selections
+      });
+      unsubs.push(() => {
+        clearTimeout(selTimer);
+        window.removeEventListener('mouseup', onMouseUp);
+        selSub.dispose();
+      });
       term.onData((d) => {
         const tab = this.tabById(id);
         if (tab && tab.status === 'exited') {

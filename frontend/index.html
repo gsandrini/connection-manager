@@ -705,6 +705,14 @@
           <button type="button" class="btn-secondary shrink-0" :disabled="termFontSize === fontDefault"
             @click="setTermFontSize(fontDefault)" x-text="t.settingsReset"></button>
         </div>
+        <label class="settings-check">
+          <input type="checkbox" :checked="autoCopySelection"
+            @change="setAutoCopySelection($event.target.checked)" />
+          <span>
+            <span class="font-medium" x-text="t.settingsAutoCopy"></span>
+            <span class="settings-hint block" x-text="t.settingsAutoCopyHint"></span>
+          </span>
+        </label>
       </section>
       <div class="flex justify-end mt-4">
         <button @click="showSettings = false" class="btn-secondary" x-text="t.settingsClose"></button>

@@ -28,6 +28,7 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 - Optional: open a connection in an external native terminal ("External" button)
 - Local shell in a tab: your own `$SHELL`, opened in your home directory ("Local" button, the `+` in the tab bar, or `Ctrl+Shift+T`)
 - Terminal font size (8–32 px) set from the Preferences panel (gear icon on the home page): global, applied instantly to every open tab and remembered across restarts
+- Optional copy-on-select (Preferences, off by default): the selected text is copied to the clipboard when you release the mouse button
 
 | Shortcut | Action |
 | --- | --- |
