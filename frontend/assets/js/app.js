@@ -2,8 +2,34 @@
 
 const STORAGE_KEY = 'connection-manager-connections';
 const VAULT_KEY = 'connection-manager-vault';
-const PREF_KEYS = { language: 'language', theme: 'theme' };
+const PREF_KEYS = { language: 'language', theme: 'theme', fontSize: 'terminalFontSize' };
 const THEME_COLORS = { light: '#f7f7f4', dark: '#181a1f' };
+
+// Terminal font size (px): global preference, applied to every terminal tab
+const TERM_FONT = { min: 8, max: 32, def: 13 };
+
+function clampFontSize(v) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return TERM_FONT.def;
+  return Math.min(TERM_FONT.max, Math.max(TERM_FONT.min, n));
+}
+
+function loadFontSize() {
+  try {
+    const raw = localStorage.getItem(PREF_KEYS.fontSize);
+    if (raw !== null) return clampFontSize(raw);
+  } catch (_) { /* storage unavailable: use the default */ }
+  return TERM_FONT.def;
+}
+
+// Ctrl + / Ctrl - / Ctrl 0  ->  +1 / -1 / 0 (reset). null when it is not a font-size shortcut.
+function fontShortcut(ev) {
+  if (!ev.ctrlKey || ev.altKey || ev.metaKey) return null;
+  if (ev.key === '+' || ev.key === '=') return 1;
+  if (ev.key === '-' || ev.key === '_') return -1;
+  if (ev.key === '0') return 0;
+  return null;
+}
 
 // Stable identifier for a connection (name+server is not unique)
 function newId() {
@@ -129,6 +155,15 @@ const TRANSLATIONS = {
     switchToEnglish: 'Passa a inglese',
     activateLightTheme: 'Attiva tema chiaro',
     activateDarkTheme: 'Attiva tema scuro',
+    settings: 'Preferenze',
+    settingsTitle: 'Preferenze',
+    settingsClose: 'Chiudi',
+    settingsTerminal: 'Terminale',
+    settingsFontSize: 'Dimensione del font',
+    settingsFontSizeHint: 'Si applica subito a tutti i terminali aperti. Scorciatoie nel terminale: Ctrl + / Ctrl − / Ctrl 0, oppure Ctrl + rotella.',
+    settingsReset: 'Ripristina',
+    fontSmaller: 'Riduci il font',
+    fontLarger: 'Aumenta il font',
   },
   en: {
     title: 'Connection Manager',
@@ -239,6 +274,15 @@ const TRANSLATIONS = {
     switchToEnglish: 'Switch to English',
     activateLightTheme: 'Activate light theme',
     activateDarkTheme: 'Activate dark theme',
+    settings: 'Preferences',
+    settingsTitle: 'Preferences',
+    settingsClose: 'Close',
+    settingsTerminal: 'Terminal',
+    settingsFontSize: 'Font size',
+    settingsFontSizeHint: 'Applies immediately to all open terminals. Shortcuts in the terminal: Ctrl + / Ctrl − / Ctrl 0, or Ctrl + mouse wheel.',
+    settingsReset: 'Reset',
+    fontSmaller: 'Decrease font size',
+    fontLarger: 'Increase font size',
   },
 };
 
@@ -259,6 +303,7 @@ SCHEDE TERMINALE
   Ctrl+Tab / Ctrl+Shift+Tab : scheda successiva / precedente
   Ctrl+Shift+W              : chiudi la scheda corrente
   Ctrl+Shift+C / Ctrl+Shift+V : copia / incolla
+  Ctrl + / Ctrl - / Ctrl 0  : font del terminale più grande / più piccolo / predefinito
   Clic destro nel terminale  : menu Copia / Incolla / Incolla password /
                                Seleziona tutto / Pulisci schermo
   Clic centrale sulla scheda : chiudi
@@ -323,6 +368,7 @@ TERMINAL TABS
   Ctrl+Tab / Ctrl+Shift+Tab : next / previous tab
   Ctrl+Shift+W              : close current tab
   Ctrl+Shift+C / Ctrl+Shift+V : copy / paste
+  Ctrl + / Ctrl - / Ctrl 0  : terminal font larger / smaller / default
   Right-click in the terminal: Copy / Paste / Paste password /
                                Select all / Clear screen menu
   Middle-click on a tab     : close
@@ -556,6 +602,13 @@ function ConnectionManagerApp() {
     // (before first paint) and read back here.
     lang: document.documentElement.lang === 'it' ? 'it' : 'en',
     theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+
+    // Preferences panel (global settings; more sections can be added later)
+    showSettings: false,
+    termFontSize: loadFontSize(),
+    fontMin: TERM_FONT.min,
+    fontMax: TERM_FONT.max,
+    fontDefault: TERM_FONT.def,
     get t() {
       return TRANSLATIONS[this.lang];
     },
@@ -587,6 +640,18 @@ function ConnectionManagerApp() {
 
     toggleTheme() {
       this.setTheme(this.theme === 'dark' ? 'light' : 'dark');
+    },
+
+    // Global terminal font size: saved, then applied to every open terminal
+    setTermFontSize(v) {
+      const n = clampFontSize(v);
+      this.termFontSize = n;
+      try { localStorage.setItem(PREF_KEYS.fontSize, String(n)); } catch (_) {}
+      for (const e of TERMS.values()) {
+        e.term.options.fontSize = n;
+        // a hidden tab can't be measured: it is refitted when selected (selectTab)
+        try { e.fit.fit(); } catch { /* ignore */ }
+      }
     },
     // Translate a backend error (a plain string coming from a rejected Wails call)
     errText(err) {
@@ -657,6 +722,19 @@ function ConnectionManagerApp() {
         }).observe(area);
       }
 
+      // Ctrl + mouse wheel changes the terminal font size (only while a terminal tab is shown)
+      let wheelAcc = 0;
+      window.addEventListener('wheel', (ev) => {
+        if (!ev.ctrlKey || this.tabs.length === 0 || this.activeTab === 'home') return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        hideTermMenu();
+        wheelAcc += ev.deltaY;
+        if (Math.abs(wheelAcc) < 50) return;   // accumulate, so trackpads don't jump
+        this.setTermFontSize(this.termFontSize + (wheelAcc < 0 ? 1 : -1));
+        wheelAcc = 0;
+      }, { passive: false, capture: true });
+
       // Tab shortcuts (work from anywhere, including inside a terminal)
       window.addEventListener('keydown', (ev) => {
         if (ev.ctrlKey && ev.shiftKey && ev.key.toLowerCase() === 't') {
@@ -665,6 +743,14 @@ function ConnectionManagerApp() {
           return;
         }
         if (this.tabs.length === 0) return;
+        if (this.activeTab !== 'home') {
+          const step = fontShortcut(ev);
+          if (step !== null) {
+            ev.preventDefault();
+            this.setTermFontSize(step === 0 ? TERM_FONT.def : this.termFontSize + step);
+            return;
+          }
+        }
         const order = ['home', ...this.tabs.map(t => t.id)];
         if (ev.ctrlKey && ev.key === 'Tab') {
           ev.preventDefault();
@@ -1140,7 +1226,7 @@ function ConnectionManagerApp() {
 
       const term = new Terminal({
         fontFamily: '"JetBrains Mono", monospace',
-        fontSize: 13,
+        fontSize: this.termFontSize,
         cursorBlink: true,
         scrollback: 10000,
         allowProposedApi: true,
@@ -1154,6 +1240,7 @@ function ConnectionManagerApp() {
       term.attachCustomKeyEventHandler((ev) => {
         if (ev.type !== 'keydown') return true;
         if (ev.ctrlKey && ev.key === 'Tab') return false;       // tab switching
+        if (fontShortcut(ev) !== null) return false;            // font size (handled globally)
         if (ev.ctrlKey && ev.shiftKey) {
           const k = ev.key.toLowerCase();
           if (k === 'w' || k === 't') return false;             // close tab / new local tab

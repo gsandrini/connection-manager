@@ -27,6 +27,7 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 - Press Enter on an ended session to reconnect
 - Optional: open a connection in an external native terminal ("External" button)
 - Local shell in a tab: your own `$SHELL`, opened in your home directory ("Local" button, the `+` in the tab bar, or `Ctrl+Shift+T`)
+- Terminal font size (8–32 px) set from the Preferences panel (gear icon on the home page): global, applied instantly to every open tab and remembered across restarts
 
 | Shortcut | Action |
 | --- | --- |
@@ -34,6 +35,7 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+Shift+W` or middle-click | Close the current tab |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste |
+| `Ctrl +` / `Ctrl -` / `Ctrl+0` (or `Ctrl` + mouse wheel) | Terminal font larger / smaller / default |
 | Right-click in the terminal | Menu: Copy, Paste, Paste password, Select all, Clear screen |
 
 **Saved passwords** (optional)

@@ -101,6 +101,14 @@
                 <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
               </svg>
             </button>
+            <button type="button" class="pref-btn" @click="showSettings = true"
+              :title="t.settings" :aria-label="t.settings">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -661,6 +669,45 @@
       <pre class="help-text text-sm text-muted overflow-auto" x-text="helpText"></pre>
       <div class="flex justify-end mt-4">
         <button @click="showHelp = false" class="btn-secondary" x-text="t.helpClose"></button>
+      </div>
+    </div>
+  </div>
+  <!-- SETTINGS MODAL -->
+  <div x-show="showSettings" class="modal-overlay" @click.self="showSettings = false"
+    @keydown.escape.window="showSettings = false">
+    <div class="modal-box">
+      <div class="flex items-center justify-between mb-4">
+        <span class="font-medium" x-text="t.settingsTitle"></span>
+        <button @click="showSettings = false" class="btn-secondary px-2 py-1 text-sm">✕</button>
+      </div>
+      <!-- Section: terminal. Add further sections (or rows) here. -->
+      <section class="settings-section">
+        <h3 class="settings-heading" x-text="t.settingsTerminal"></h3>
+        <div class="settings-row">
+          <label for="term-font-size" class="font-medium" x-text="t.settingsFontSize"></label>
+          <span class="settings-value" x-text="termFontSize + ' px'"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" class="pref-btn" :title="t.fontSmaller" :aria-label="t.fontSmaller"
+            :disabled="termFontSize <= fontMin" @click="setTermFontSize(termFontSize - 1)">−</button>
+          <input id="term-font-size" type="range" class="settings-range" step="1"
+            :min="fontMin" :max="fontMax" :value="termFontSize"
+            @input="setTermFontSize($event.target.value)" />
+          <button type="button" class="pref-btn" :title="t.fontLarger" :aria-label="t.fontLarger"
+            :disabled="termFontSize >= fontMax" @click="setTermFontSize(termFontSize + 1)">+</button>
+        </div>
+        <div class="settings-preview" :style="{ fontSize: termFontSize + 'px' }" aria-hidden="true">
+          <div>user@host:~$ ls</div>
+          <div>AaBbCc 0123 {}[]</div>
+        </div>
+        <div class="flex items-start justify-between gap-3 mt-2">
+          <p class="settings-hint" x-text="t.settingsFontSizeHint"></p>
+          <button type="button" class="btn-secondary shrink-0" :disabled="termFontSize === fontDefault"
+            @click="setTermFontSize(fontDefault)" x-text="t.settingsReset"></button>
+        </div>
+      </section>
+      <div class="flex justify-end mt-4">
+        <button @click="showSettings = false" class="btn-secondary" x-text="t.settingsClose"></button>
       </div>
     </div>
   </div>
