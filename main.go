@@ -20,8 +20,8 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title: "Connection Manager",
-		Width: 960,
-		Height: 620,
+		Width: 1280,
+		Height: 780,
 		MinWidth: 720,
 		MinHeight: 480,
 		AssetServer: &assetserver.Options{

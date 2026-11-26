@@ -6,7 +6,11 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 
 ## Screenshot
 
+### Connection Manager
 ![image](./assets/screenshots/connection-manager.png)
+
+### Tiled Terminals
+![image](assets/screenshots/connection-manager-tiled-terminals.png)
 
 ---
 
@@ -18,23 +22,25 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 - Tree view grouped by environment and group
 - Table view with sortable columns
 - Real-time search across name, server, username, group and labels
-- Import connections from CSV / export connections to CSV (passwords are never exported)
+- Import connections from CSV / export connections to CSV (passwords are never exported), under **Preferences > Data**, next to **Delete all**
 
 **Terminal tabs**
 
 - Embedded SSH terminal in tabs (xterm.js + PTY): many sessions, one window
 - Uses your system `ssh`, so keys, `ssh-agent` and `~/.ssh/config` work as usual
 - Press Enter on an ended session to reconnect
-- Optional: open a connection in an external native terminal ("External" button)
 - Local shell in a tab: your own `$SHELL`, opened in your home directory ("Local" button, the `+` in the tab bar, or `Ctrl+Shift+T`)
 - Terminal font size (8–32 px) set from the Preferences panel (gear icon on the home page): global, applied instantly to every open tab and remembered across restarts
 - Optional copy-on-select (Preferences, off by default): the selected text is copied to the clipboard when you release the mouse button
+- **Tiles**: turn on the **Open in tiles** switch at the bottom right of the connection list and new terminals open side by side in a single **Tiles** tab (2x2 grid, up to 4 terminals) instead of one tab each. With it unticked (default) every terminal gets its own tab. The choice is remembered across restarts; when the grid is full a red message says so and nothing is opened
+- **Broadcast input** (Tiles tab): tick it to send what you type or paste in the focused tile to every tile. It always starts off, and while it is on the tiles and the bar turn red. A password typed by hand also goes to every terminal
 
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+Shift+T` | New local shell tab |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
-| `Ctrl+Shift+W` or middle-click | Close the current tab |
+| `Ctrl+Shift+W` or middle-click | Close the current tab (in Tiles: the focused tile; middle-click or the ✕ on the Tiles tab closes all its terminals) |
+| `Ctrl+Shift+←` / `Ctrl+Shift+→` | Move focus between tiles |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste |
 | `Ctrl +` / `Ctrl -` / `Ctrl+0` (or `Ctrl` + mouse wheel) | Terminal font larger / smaller / default |
 | Right-click in the terminal | Menu: Copy, Paste, Paste password, Select all, Clear screen |

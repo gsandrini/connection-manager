@@ -45,7 +45,20 @@
       </svg>
       <span class="tab-label" x-text="t.tabHome"></span>
     </button>
-    <template x-for="tab in tabs" :key="tab.id">
+    <!-- TILES TAB (one tab holding every terminal opened with "Open in tiles") -->
+    <div x-show="tiledTabs.length > 0" class="tab" :class="{ active: activeTab === 'tiles' }"
+      @click="selectTab('tiles')" @mousedown="$event.button === 1 && $event.preventDefault()"
+      @auxclick="$event.button === 1 && closeTiles()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+        stroke="currentColor" stroke-width="2" class="icon-fixed">
+        <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" />
+      </svg>
+      <span class="tab-label" x-text="t.tabTiles"></span>
+      <span class="tab-count" x-text="tiledTabs.length"></span>
+      <span x-show="broadcast" class="tab-rec" :title="t.broadcastOn">●</span>
+      <button class="tab-close" :title="t.closeTiles(tiledTabs.length)" @click.stop="closeTiles()">✕</button>
+    </div>
+    <template x-for="tab in normalTabs" :key="tab.id">
       <div class="tab" :class="{ active: activeTab === tab.id }" :title="tab.title" @click="selectTab(tab.id)"
         @mousedown="$event.button === 1 && $event.preventDefault()"
         @auxclick="$event.button === 1 && closeTab(tab.id)">
@@ -58,7 +71,7 @@
   </div>
   <!-- HOME (connection list) -->
   <div x-show="activeTab === 'home'" class="app-scroll">
-  <div class="home-content max-w-4xl mx-auto py-4 px-4">
+  <div class="home-content max-w-7xl mx-auto py-4 px-4">
     <!-- Header -->
     <div class="mb-6">
       <div class="flex items-center justify-between mb-1">
@@ -101,6 +114,15 @@
                 <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
               </svg>
             </button>
+            <button type="button" class="pref-btn" @click="showHelp = true"
+              :title="t.help" :aria-label="t.help">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </button>
             <button type="button" class="pref-btn" @click="showSettings = true"
               :title="t.settings" :aria-label="t.settings">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
@@ -117,7 +139,7 @@
     <div class="flex items-center gap-2 mb-3 flex-wrap">
       <input type="text" x-model="searchText" :placeholder="t.search" class="field-input flex-1 min-w-40" />
       <button @click="view = 'tree'" :class="view === 'tree' ? 'btn-primary' : 'btn-secondary'"
-        class="gap-1.5 text-sm px-3">
+        class="btn-view gap-1.5 text-sm px-3">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <path d="M3 3h4v4H3zM3 10h4v4H3zM3 17h4v4H3zM10 4h11M10 12h11M10 20h11" />
@@ -125,7 +147,7 @@
         <span x-text="t.treeView"></span>
       </button>
       <button @click="view = 'table'" :class="view === 'table' ? 'btn-primary' : 'btn-secondary'"
-        class="gap-1.5 text-sm px-3">
+        class="btn-view gap-1.5 text-sm px-3">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -135,12 +157,13 @@
         </svg>
         <span x-text="t.tableView"></span>
       </button>
-      <button @click="toggleCheckAll()" class="btn-secondary gap-1.5 text-sm px-3"
+      <button @click="toggleCheckAll()" class="btn-secondary btn-fixed gap-1.5 text-sm px-3"
         :disabled="filteredConnections.length === 0">
         <span x-text="allCheck === 'all' ? t.deselectAll : t.selectAll"></span>
       </button>
-      <template x-if="view === 'tree'">
-        <button @click="toggleAll()" class="btn-secondary gap-1.5 text-sm px-3"
+      <!-- Always rendered, only hidden in table view: the toolbar must not change width -->
+      <button @click="toggleAll()" class="btn-secondary btn-fixed gap-1.5 text-sm px-3"
+          :class="{ invisible: view !== 'tree' }" :tabindex="view === 'tree' ? 0 : -1"
           :disabled="filteredConnections.length === 0">
           <svg x-show="!allExpanded" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
             viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -158,14 +181,16 @@
           </svg>
           <span x-text="allExpanded ? t.collapseAll : t.expandAll"></span>
         </button>
-      </template>
     </div>
     <!-- Main card -->
-    <div class="card mb-3 overflow-hidden">
+    <div class="card list-card mb-3 overflow-hidden">
       <!-- TREE VIEW -->
       <div x-show="view === 'tree'" class="connection-list">
         <template x-if="connections.length === 0">
-          <div class="empty-state" x-text="t.noConnections"></div>
+          <div class="empty-state">
+            <span x-text="t.noConnections"></span>
+            <button type="button" class="empty-link" @click="importCSV()" x-text="t.importCsv"></button>
+          </div>
         </template>
         <template x-if="connections.length > 0 && filteredConnections.length === 0">
           <div class="empty-state" x-text="t.noResults"></div>
@@ -329,7 +354,10 @@
       <!-- TABLE VIEW -->
       <div x-show="view === 'table'" class="connection-list overflow-x-auto">
         <template x-if="connections.length === 0">
-          <div class="empty-state" x-text="t.noConnections"></div>
+          <div class="empty-state">
+            <span x-text="t.noConnections"></span>
+            <button type="button" class="empty-link" @click="importCSV()" x-text="t.importCsv"></button>
+          </div>
         </template>
         <template x-if="connections.length > 0 && filteredConnections.length === 0">
           <div class="empty-state" x-text="t.noResults"></div>
@@ -403,16 +431,6 @@
         </svg>
         <span x-text="t.connect"></span>
       </button>
-      <button @click="connectExternalSelected()" class="btn-secondary gap-1.5" :title="t.connectExternalHint"
-        :disabled="!selectedConn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor" stroke-width="2">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-          <polyline points="15 3 21 3 21 9" />
-          <line x1="10" y1="14" x2="21" y2="3" />
-        </svg>
-        <span x-text="t.connectExternal"></span>
-      </button>
       <button @click="openLocalTab()" class="btn-secondary gap-1.5" :title="t.connectLocalHint">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
           stroke="currentColor" stroke-width="2">
@@ -439,57 +457,45 @@
         </svg>
         <span x-text="t.delete"></span>
       </button>
-      <button @click="deleteAll()" class="btn-danger gap-1.5" :disabled="connections.length === 0">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6l-1 14H6L5 6" />
-          <path d="M10 11v6M14 11v6" />
-          <path d="M9 6V4h6v2" />
-          <line x1="18" y1="18" x2="22" y2="22" />
-          <line x1="22" y1="18" x2="18" y2="22" />
-        </svg>
-        <span x-text="t.deleteAll"></span>
-      </button>
       <div class="flex-1"></div>
-      <button @click="importCSV()" class="btn-secondary gap-1.5">
+      <!-- Where the next terminal opens: a new tab (off) or the Tiles tab (on) -->
+      <label class="btn-secondary gap-1.5 tiles-option" :title="t.openInTilesHint">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
+          stroke="currentColor" stroke-width="2" class="icon-fixed">
+          <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" />
         </svg>
-        <span x-text="t.importCsv"></span>
-      </button>
-      <button @click="exportCSV()" class="btn-secondary gap-1.5" :disabled="connections.length === 0">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 16 12 21 17 16" />
-          <line x1="12" y1="21" x2="12" y2="9" />
-        </svg>
-        <span x-text="t.exportCsv"></span>
-      </button>
-      <button @click="showHelp = true" class="btn-secondary gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-          stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <span x-text="t.help"></span>
-      </button>
+        <span x-text="t.openInTiles"></span>
+        <input type="checkbox" :checked="openInTiles" @change="setOpenInTiles($event.target.checked)">
+      </label>
     </div>
   </div>
   <div class="app-footer">
     <span class="text-xs text-subtle" x-text="t.madeWith"></span>
   </div>
   </div>
-  <!-- TERMINAL AREA (one pane per tab, kept mounted to preserve scrollback) -->
-  <div x-show="activeTab !== 'home'" class="term-area">
-    <template x-for="tab in tabs" :key="tab.id">
-      <div :id="'term-' + tab.id" class="term-pane" x-show="activeTab === tab.id"></div>
-    </template>
+  <!-- TERMINAL AREA (one cell per terminal, kept mounted to preserve scrollback;
+       the cells of the Tiles tab share a 2x2 grid) -->
+  <div x-show="activeTab !== 'home'" class="term-wrap">
+    <div x-show="activeTab === 'tiles'" class="tiles-bar" :class="{ on: broadcast }">
+      <label class="tiles-check" :title="t.broadcastHint">
+        <input type="checkbox" :checked="broadcast" @change="setBroadcast($event.target.checked)">
+        <span x-text="t.broadcast"></span>
+      </label>
+    </div>
+    <div class="term-area" :style="gridStyle" :class="{ broadcast: broadcast && activeTab === 'tiles' }">
+      <template x-for="tab in tabs" :key="tab.id">
+        <div class="term-cell" x-show="isShown(tab)"
+          :class="{ focused: tab.tiled && tiledTabs.length > 1 && currentTermId() === tab.id }"
+          :style="cellStyle(tab)" @mousedown="tab.tiled && (tileFocus = tab.id)">
+          <div class="term-head" x-show="tab.tiled">
+            <span class="tab-dot" :class="tab.status"></span>
+            <span class="tab-label" x-text="tab.label" :title="tab.title"></span>
+            <button class="tab-close" :title="t.closeTile" @click.stop="closeTab(tab.id)">✕</button>
+          </div>
+          <div :id="'term-' + tab.id" class="term-pane"></div>
+        </div>
+      </template>
+    </div>
   </div>
   <!-- ADD / EDIT MODAL -->
   <div x-show="showAddModal" class="modal-overlay" @click.self="closeAddModal()">
@@ -675,7 +681,7 @@
   <!-- SETTINGS MODAL -->
   <div x-show="showSettings" class="modal-overlay" @click.self="showSettings = false"
     @keydown.escape.window="showSettings = false">
-    <div class="modal-box">
+    <div class="modal-box modal-box-scroll">
       <div class="flex items-center justify-between mb-4">
         <span class="font-medium" x-text="t.settingsTitle"></span>
         <button @click="showSettings = false" class="btn-secondary px-2 py-1 text-sm">✕</button>
@@ -713,6 +719,47 @@
             <span class="settings-hint block" x-text="t.settingsAutoCopyHint"></span>
           </span>
         </label>
+      </section>
+      <!-- Section: data. The panel closes first, so a file dialog or the confirmation is never stacked on it -->
+      <section class="settings-section">
+        <h3 class="settings-heading" x-text="t.settingsData"></h3>
+        <div class="flex flex-wrap gap-2">
+          <button @click="showSettings = false; importCSV()" class="btn-secondary gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <span x-text="t.importCsv"></span>
+          </button>
+          <button @click="showSettings = false; exportCSV()" class="btn-secondary gap-1.5"
+            :disabled="connections.length === 0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 16 12 21 17 16" />
+              <line x1="12" y1="21" x2="12" y2="9" />
+            </svg>
+            <span x-text="t.exportCsv"></span>
+          </button>
+        </div>
+        <div class="settings-danger">
+          <button @click="showSettings = false; deleteAll()" class="btn-danger gap-1.5 shrink-0"
+            :disabled="connections.length === 0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4h6v2" />
+              <line x1="18" y1="18" x2="22" y2="22" />
+              <line x1="22" y1="18" x2="18" y2="22" />
+            </svg>
+            <span x-text="t.deleteAll"></span>
+          </button>
+          <p class="settings-hint" x-text="t.settingsDeleteAllHint"></p>
+        </div>
       </section>
       <div class="flex justify-end mt-4">
         <button @click="showSettings = false" class="btn-secondary" x-text="t.settingsClose"></button>

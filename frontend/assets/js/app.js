@@ -7,6 +7,7 @@ const PREF_KEYS = {
   theme: 'theme',
   fontSize: 'terminalFontSize',
   autoCopy: 'terminalCopyOnSelect',
+  openInTiles: 'terminalOpenInTiles',
 };
 const THEME_COLORS = { light: '#f7f7f4', dark: '#181a1f' };
 
@@ -30,6 +31,14 @@ function loadFontSize() {
 // Copy-on-select is opt-in: off unless the user enabled it
 function loadAutoCopy() {
   try { return localStorage.getItem(PREF_KEYS.autoCopy) === '1'; } catch (_) { return false; }
+}
+
+// Tiles: terminals opened with "Open in tiles" share one tab, laid out as a 2x2 grid
+const TILES_MAX = 4;
+
+// Open-in-tiles is opt-in: off unless the user enabled it (broadcast is never saved)
+function loadOpenInTiles() {
+  try { return localStorage.getItem(PREF_KEYS.openInTiles) === '1'; } catch (_) { return false; }
 }
 
 // Ctrl + / Ctrl - / Ctrl 0  ->  +1 / -1 / 0 (reset). null when it is not a font-size shortcut.
@@ -105,8 +114,15 @@ const TRANSLATIONS = {
     connectLocal: 'Locale',
     connectLocalHint: 'Apri una shell locale in una nuova scheda (Ctrl+Shift+T)',
     closeTab: 'Chiudi scheda',
-    connectExternal: 'Esterno',
-    connectExternalHint: 'Apri in un terminale esterno',
+    tabTiles: 'Tiles',
+    closeTiles: (n) => `Chiudi la scheda Tiles e i suoi ${n} terminali`,
+    closeTile: 'Chiudi terminale',
+    openInTiles: 'Apri in tiles',
+    openInTilesHint: 'Apre i nuovi terminali affiancati nella scheda Tiles (max 4) invece che in una nuova scheda',
+    tilesFull: 'Impossibile aprire un altro terminale: raggiunto il limite massimo di 4 terminali in tiles.',
+    broadcast: 'Broadcast input',
+    broadcastHint: 'Ciò che digiti o incolli in un tile viene inviato a tutti i tile',
+    broadcastOn: 'BROADCAST ATTIVO: ciò che digiti va a tutti i terminali',
     terminalError: 'Impossibile avviare la sessione SSH.',
     ctxCopy: 'Copia',
     ctxPaste: 'Incolla',
@@ -171,6 +187,8 @@ const TRANSLATIONS = {
     settingsTitle: 'Preferenze',
     settingsClose: 'Chiudi',
     settingsTerminal: 'Terminale',
+    settingsData: 'Dati',
+    settingsDeleteAllHint: 'Rimuove tutte le connessioni salvate. Chiede conferma.',
     settingsFontSize: 'Dimensione del font',
     settingsFontSizeHint: 'Si applica subito a tutti i terminali aperti. Scorciatoie nel terminale: Ctrl + / Ctrl − / Ctrl 0, oppure Ctrl + rotella.',
     settingsReset: 'Ripristina',
@@ -226,8 +244,15 @@ const TRANSLATIONS = {
     connectLocal: 'Local',
     connectLocalHint: 'Open a local shell in a new tab (Ctrl+Shift+T)',
     closeTab: 'Close tab',
-    connectExternal: 'External',
-    connectExternalHint: 'Open in an external terminal',
+    tabTiles: 'Tiles',
+    closeTiles: (n) => `Close the Tiles tab and its ${n} terminals`,
+    closeTile: 'Close terminal',
+    openInTiles: 'Open in tiles',
+    openInTilesHint: 'Opens new terminals side by side in the Tiles tab (max 4) instead of a new tab',
+    tilesFull: 'Cannot open another terminal: the limit of 4 terminals in tiles has been reached.',
+    broadcast: 'Broadcast input',
+    broadcastHint: 'What you type or paste in one tile is sent to all tiles',
+    broadcastOn: 'BROADCAST ON: what you type goes to every terminal',
     terminalError: 'Could not start the SSH session.',
     ctxCopy: 'Copy',
     ctxPaste: 'Paste',
@@ -292,6 +317,8 @@ const TRANSLATIONS = {
     settingsTitle: 'Preferences',
     settingsClose: 'Close',
     settingsTerminal: 'Terminal',
+    settingsData: 'Data',
+    settingsDeleteAllHint: 'Removes every saved connection. Asks for confirmation.',
     settingsFontSize: 'Font size',
     settingsFontSizeHint: 'Applies immediately to all open terminals. Shortcuts in the terminal: Ctrl + / Ctrl − / Ctrl 0, or Ctrl + mouse wheel.',
     settingsReset: 'Reset',
@@ -309,19 +336,32 @@ GESTIONE CONNESSIONI
   Elimina    : seleziona e premi "Elimina"
   Connetti   : doppio clic o seleziona + "Connetti"
                (si apre in una scheda con terminale integrato)
-  Esterno    : apre la connessione in un terminale di sistema
   Locale     : apre la tua shell locale in una scheda
+  Apri in tiles : interruttore in basso a destra. Se attivo, i nuovi
+                  terminali si aprono affiancati nella scheda Tiles
+                  (griglia 2x2, max 4) invece che in una nuova scheda
+
+PREFERENZE (ingranaggio in alto a destra)
+  Terminale  : dimensione del font, copia alla selezione
+  Dati       : importa/esporta CSV, elimina tutte le connessioni
 
 SCHEDE TERMINALE
   Ctrl+Shift+T              : nuova shell locale
   Ctrl+Tab / Ctrl+Shift+Tab : scheda successiva / precedente
-  Ctrl+Shift+W              : chiudi la scheda corrente
+  Ctrl+Shift+W              : chiudi la scheda (o il tile) corrente
+  Ctrl+Shift+Frecce sx/dx   : sposta il focus tra i tile
   Ctrl+Shift+C / Ctrl+Shift+V : copia / incolla
   Ctrl + / Ctrl - / Ctrl 0  : font del terminale più grande / più piccolo / predefinito
   Clic destro nel terminale  : menu Copia / Incolla / Incolla password /
                                Seleziona tutto / Pulisci schermo
-  Clic centrale sulla scheda : chiudi
+  Clic centrale sulla scheda : chiudi (la scheda Tiles chiude tutti i suoi terminali)
   Invio a sessione terminata : riconnetti
+
+BROADCAST (scheda Tiles)
+  Con "Broadcast input" attivo, ciò che digiti o incolli nel tile
+  con il focus viene inviato a tutti i tile. Parte sempre spento;
+  quando è attivo i tile diventano rossi. Attenzione: una password
+  digitata a mano finisce in tutti i terminali.
 
 RICERCA
   La barra di ricerca filtra per nome, server,
@@ -335,7 +375,7 @@ GRUPPI GERARCHICI
   Il campo Gruppo supporta percorsi separati da "/".
   Esempio: prod/web
 
-IMPORTA CSV
+IMPORTA CSV (Preferenze > Dati)
   Colonne: name, server, port, username, group, labels
 
   Esempio:
@@ -374,19 +414,31 @@ MANAGING CONNECTIONS
   Delete   : select and press "Delete"
   Connect  : double-click or select + "Connect"
              (opens in a tab with an embedded terminal)
-  External : opens the connection in a system terminal
   Local    : opens your local shell in a tab
+  Open in tiles : switch at the bottom right. When on, new terminals
+                  open side by side in the Tiles tab (2x2 grid, max 4)
+                  instead of a new tab
+
+PREFERENCES (gear icon, top right)
+  Terminal : font size, copy on select
+  Data     : import/export CSV, delete all connections
 
 TERMINAL TABS
   Ctrl+Shift+T              : new local shell
   Ctrl+Tab / Ctrl+Shift+Tab : next / previous tab
-  Ctrl+Shift+W              : close current tab
+  Ctrl+Shift+W              : close the current tab (or tile)
+  Ctrl+Shift+Left/Right     : move focus between tiles
   Ctrl+Shift+C / Ctrl+Shift+V : copy / paste
   Ctrl + / Ctrl - / Ctrl 0  : terminal font larger / smaller / default
   Right-click in the terminal: Copy / Paste / Paste password /
                                Select all / Clear screen menu
-  Middle-click on a tab     : close
+  Middle-click on a tab     : close (the Tiles tab closes all its terminals)
   Enter on an ended session : reconnect
+
+BROADCAST (Tiles tab)
+  With "Broadcast input" on, what you type or paste in the focused
+  tile is sent to every tile. It always starts off; tiles turn red
+  while it is on. Careful: a password typed by hand goes to all terminals.
 
 SEARCH
   The search bar filters by name, server,
@@ -400,7 +452,7 @@ HIERARCHICAL GROUPS
   The Group field supports slash-separated paths.
   Example: prod/web
 
-IMPORT CSV
+IMPORT CSV (Preferences > Data)
   Columns: name, server, port, username, group, labels
 
   Example:
@@ -495,6 +547,8 @@ function buildTree(connections) {
  * id -> { term, fit, unsubs: [] }
  */
 const TERMS = new Map();
+// Refits a terminal when its pane changes size (created in init, used by openTab/disposeTerm)
+let paneRO = null;
 
 function b64ToBytes(b64) {
   const bin = atob(b64);
@@ -620,6 +674,8 @@ function ConnectionManagerApp() {
     // Preferences panel (global settings; more sections can be added later)
     showSettings: false,
     termFontSize: loadFontSize(),
+    openInTiles: loadOpenInTiles(),
+    broadcast: false,    // never persisted: always off at startup
     autoCopySelection: loadAutoCopy(),
     fontMin: TERM_FONT.min,
     fontMax: TERM_FONT.max,
@@ -661,6 +717,15 @@ function ConnectionManagerApp() {
     setAutoCopySelection(on) {
       this.autoCopySelection = !!on;
       try { localStorage.setItem(PREF_KEYS.autoCopy, on ? '1' : '0'); } catch (_) {}
+    },
+
+    setOpenInTiles(on) {
+      this.openInTiles = !!on;
+      try { localStorage.setItem(PREF_KEYS.openInTiles, on ? '1' : '0'); } catch (_) {}
+    },
+    setBroadcast(on) {
+      this.broadcast = !!on;
+      this.$nextTick(() => this.fitActive(true));   // the bar above the tiles changes the height
     },
 
     // Global terminal font size: saved, then applied to every open terminal
@@ -719,7 +784,8 @@ function ConnectionManagerApp() {
     bulkBusy: false,
 
     tabs: [],            // terminal sessions (plain metadata only)
-    activeTab: 'home',   // 'home' or a tab id
+    activeTab: 'home',   // 'home', 'tiles' or a tab id
+    tileFocus: null,     // id of the tile that has the keyboard focus
     tabSeq: 0,
 
     init() {
@@ -733,14 +799,18 @@ function ConnectionManagerApp() {
       });
       this.initVault();
 
-      // Refit the active terminal whenever the available area changes size
-      const area = document.querySelector('.term-area');
-      if (area && 'ResizeObserver' in window) {
-        let raf = 0;
-        new ResizeObserver(() => {
-          cancelAnimationFrame(raf);
-          raf = requestAnimationFrame(() => this.fitActive(false));
-        }).observe(area);
+      // Each terminal pane refits itself when its size changes (window resize,
+      // tiles added or removed, broadcast bar shown): see openTab
+      if ('ResizeObserver' in window) {
+        paneRO = new ResizeObserver((entries) => {
+          for (const en of entries) {
+            const id = en.target.dataset.termId;
+            const e = TERMS.get(id);
+            if (!e || en.target.clientWidth === 0) continue;   // hidden: refitted when shown
+            cancelAnimationFrame(e.raf);
+            e.raf = requestAnimationFrame(() => { try { e.fit.fit(); } catch { /* ignore */ } });
+          }
+        });
       }
 
       // Ctrl + mouse wheel changes the terminal font size (only while a terminal tab is shown)
@@ -772,7 +842,7 @@ function ConnectionManagerApp() {
             return;
           }
         }
-        const order = ['home', ...this.tabs.map(t => t.id)];
+        const order = ['home', ...(this.tiledTabs.length ? ['tiles'] : []), ...this.normalTabs.map(t => t.id)];
         if (ev.ctrlKey && ev.key === 'Tab') {
           ev.preventDefault();
           const i = order.indexOf(this.activeTab);
@@ -780,7 +850,13 @@ function ConnectionManagerApp() {
           this.selectTab(order[(i + step + order.length) % order.length]);
         } else if (ev.ctrlKey && ev.shiftKey && ev.key.toLowerCase() === 'w' && this.activeTab !== 'home') {
           ev.preventDefault();
-          this.closeTab(this.activeTab);
+          // in the Tiles tab only the focused tile is closed, never the whole grid
+          const id = this.activeTab === 'tiles' ? this.currentTermId() : this.activeTab;
+          if (id) this.closeTab(id);
+        } else if (ev.ctrlKey && ev.shiftKey && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight')
+                   && this.activeTab === 'tiles') {
+          ev.preventDefault();
+          this.moveTileFocus(ev.key === 'ArrowLeft' ? -1 : 1);
         }
       });
     },
@@ -1003,20 +1079,8 @@ function ConnectionManagerApp() {
     openLocalTab() {
       return this.openTab({ id: 'local', name: this.t.localTab, local: true });
     },
-    // Old behaviour: spawn a system terminal window
-    async connectExternal(conn) {
-      try {
-        await window.go.main.App.OpenSSH(conn.username, conn.server, conn.port);
-      } catch (err) {
-        this.showToast(this.t.connectError, true);
-        console.error('OpenSSH error:', err);
-      }
-    },
     connectSelected() {
       if (this.selectedConn) this.connectConn(this.selectedConn);
-    },
-    connectExternalSelected() {
-      if (this.selectedConn) this.connectExternal(this.selectedConn);
     },
 
     /*
@@ -1228,16 +1292,66 @@ function ConnectionManagerApp() {
     tabById(id) {
       return this.tabs.find(t => t.id === id);
     },
+    // Terminals living in the Tiles tab / in their own tabs
+    get tiledTabs() { return this.tabs.filter(t => t.tiled); },
+    get normalTabs() { return this.tabs.filter(t => !t.tiled); },
+    // A terminal is on screen when its own tab is active, or when it is a tile and Tiles is active
+    isShown(tab) {
+      return tab.tiled ? this.activeTab === 'tiles' : this.activeTab === tab.id;
+    },
+    // The terminal that has (or should get) the keyboard focus
+    currentTermId() {
+      if (this.activeTab === 'tiles') {
+        const t = this.tabById(this.tileFocus);
+        return t && t.tiled ? t.id : (this.tiledTabs[0] ? this.tiledTabs[0].id : null);
+      }
+      return TERMS.has(this.activeTab) ? this.activeTab : null;
+    },
+    // 2x2 grid: 1 tile fills the area, 2 sit side by side, 3 = two on top and a wide one below
+    get gridStyle() {
+      const n = this.activeTab === 'tiles' ? this.tiledTabs.length : 1;
+      return {
+        'grid-template-columns': n > 1 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+        'grid-template-rows': n > 2 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+      };
+    },
+    cellStyle(tab) {
+      if (!tab.tiled || !this.isShown(tab)) return {};
+      const tiles = this.tiledTabs;
+      const wide = tiles.length === 3 && tiles[2].id === tab.id;
+      return wide ? { 'grid-column': '1 / -1' } : {};
+    },
+    moveTileFocus(step) {
+      const tiles = this.tiledTabs;
+      if (tiles.length < 2) return;
+      const i = tiles.findIndex(t => t.id === this.currentTermId());
+      this.tileFocus = tiles[(i + step + tiles.length) % tiles.length].id;
+      this.fitActive(true);
+    },
+    // What the person types or pastes in a tile goes to every other running tile
+    broadcastData(fromId, data) {
+      const App = window.go.main.App;
+      for (const t of this.tiledTabs) {
+        if (t.id === fromId || t.status !== 'running') continue;
+        Promise.resolve(App.WriteTerminal(t.id, data)).catch(() => {});
+      }
+    },
     async openTab(conn) {
+      const tiled = this.openInTiles;
+      if (tiled && this.tiledTabs.length >= TILES_MAX) {
+        this.showToast(this.t.tilesFull, true);
+        return;
+      }
       const same = this.tabs.filter(t => t.connName === conn.name).length;
       const id = 't' + (++this.tabSeq) + Math.random().toString(36).slice(2, 7);
       this.tabs.push({
         id, connName: conn.name, connId: conn.id,
         label: same ? `${conn.name} (${same + 1})` : conn.name,
         title: conn.local ? 'shell' : `${conn.username}@${conn.server}:${conn.port}`,
-        status: 'connecting', exitCode: null,
+        status: 'connecting', exitCode: null, tiled,
       });
-      this.activeTab = id;
+      if (tiled) this.tileFocus = id;
+      this.activeTab = tiled ? 'tiles' : id;
       await this.$nextTick();
       // Measure characters with the real font, not the fallback
       try { await document.fonts.ready; } catch { /* ignore */ }
@@ -1257,6 +1371,20 @@ function ConnectionManagerApp() {
       term.loadAddon(fit);
       term.open(el);
       try { fit.fit(); } catch { /* ignore */ }
+      el.dataset.termId = id;
+      if (paneRO) paneRO.observe(el);
+      // A tile that gets the keyboard focus becomes the focused tile
+      el.addEventListener('focusin', () => {
+        const tb = this.tabById(id);
+        if (tb && tb.tiled) this.tileFocus = id;
+      });
+      // Only real user input is broadcast: not the replies xterm sends to terminal
+      // queries, focus reports or mouse reports. Keyboard and paste mark a short window.
+      let lastInput = 0;
+      const markInput = () => { lastInput = Date.now(); };
+      el.addEventListener('keydown', markInput, true);
+      el.addEventListener('paste', markInput, true);
+      el.addEventListener('compositionend', markInput, true);
 
       term.attachCustomKeyEventHandler((ev) => {
         if (ev.type !== 'keydown') return true;
@@ -1265,6 +1393,7 @@ function ConnectionManagerApp() {
         if (ev.ctrlKey && ev.shiftKey) {
           const k = ev.key.toLowerCase();
           if (k === 'w' || k === 't') return false;             // close tab / new local tab
+          if (k === 'arrowleft' || k === 'arrowright') return false;   // move focus between tiles
           if (k === 'v') return false;                          // native paste event
           if (k === 'c') {                                      // copy selection
             const sel = term.getSelection();
@@ -1283,7 +1412,7 @@ function ConnectionManagerApp() {
       // term.paste() honours bracketed-paste mode and converts newlines
       const pasteClip = async () => {
         const text = await clipRead();
-        if (text) term.paste(text);
+        if (text) { markInput(); term.paste(text); }
         term.focus();
       };
       el.addEventListener('contextmenu', (ev) => {
@@ -1360,10 +1489,13 @@ function ConnectionManagerApp() {
           return;
         }
         App.WriteTerminal(id, d);
+        if (this.broadcast && tab && tab.tiled && Date.now() - lastInput < 150) {
+          this.broadcastData(id, d);
+        }
       });
       term.onResize(({ cols, rows }) => App.ResizeTerminal(id, cols, rows));
 
-      TERMS.set(id, { term, fit, unsubs });
+      TERMS.set(id, { term, fit, unsubs, raf: 0, el });
       term.focus();
       if (conn.passwordEnc && this.vaultState !== 'unlocked') {
         this.showToast(this.t.autofillLocked, true);
@@ -1407,27 +1539,59 @@ function ConnectionManagerApp() {
       this.activeTab = id;
       this.$nextTick(() => this.fitActive(true));
     },
+    // Refit every terminal on screen; optionally give the focus to the current one
     fitActive(focus) {
-      const e = TERMS.get(this.activeTab);
+      for (const t of this.tabs) {
+        if (!this.isShown(t)) continue;
+        const e = TERMS.get(t.id);
+        if (e) { try { e.fit.fit(); } catch { /* hidden or not measurable yet */ } }
+      }
+      if (focus) {
+        const e = TERMS.get(this.currentTermId());
+        if (e) e.term.focus();
+      }
+    },
+    disposeTerm(id) {
+      Promise.resolve(window.go.main.App.CloseTerminal(id)).catch(() => {});
+      const e = TERMS.get(id);
       if (!e) return;
-      try { e.fit.fit(); } catch { /* hidden or not measurable yet */ }
-      if (focus) e.term.focus();
+      cancelAnimationFrame(e.raf);
+      if (paneRO && e.el) paneRO.unobserve(e.el);
+      e.unsubs.forEach(u => { try { u(); } catch { /* ignore */ } });
+      e.term.dispose();
+      TERMS.delete(id);
+    },
+    // After something closed: where to go if the tab on screen is gone
+    afterClose(wasActive, normalIdx) {
+      if (!this.tiledTabs.length) this.broadcast = false;
+      if (this.activeTab === 'tiles' && !this.tiledTabs.length) wasActive = true;
+      if (!wasActive) {
+        // still on screen: the tiles left have more room now, keep the focus on a live one
+        if (this.activeTab === 'tiles' && !this.tabById(this.tileFocus)) this.tileFocus = null;
+        this.$nextTick(() => this.fitActive(this.activeTab === 'tiles'));
+        return;
+      }
+      const normal = this.normalTabs;
+      const next = normal[normalIdx] || normal[normalIdx - 1];
+      this.selectTab(next ? next.id : (this.tiledTabs.length ? 'tiles' : 'home'));
     },
     closeTab(id) {
       const idx = this.tabs.findIndex(t => t.id === id);
       if (idx === -1) return;
-      Promise.resolve(window.go.main.App.CloseTerminal(id)).catch(() => {});
-      const e = TERMS.get(id);
-      if (e) {
-        e.unsubs.forEach(u => { try { u(); } catch { /* ignore */ } });
-        e.term.dispose();
-        TERMS.delete(id);
-      }
+      const tab = this.tabs[idx];
+      const normalIdx = this.normalTabs.indexOf(tab);
+      const wasActive = tab.tiled ? false : this.activeTab === id;
+      this.disposeTerm(id);
       this.tabs.splice(idx, 1);
-      if (this.activeTab === id) {
-        const next = this.tabs[idx] || this.tabs[idx - 1];
-        this.selectTab(next ? next.id : 'home');
-      }
+      this.afterClose(wasActive, normalIdx);
+    },
+    // The Tiles tab itself: closes every terminal it contains (no confirmation yet)
+    closeTiles() {
+      const wasActive = this.activeTab === 'tiles';
+      for (const t of this.tiledTabs) this.disposeTerm(t.id);
+      this.tabs = this.tabs.filter(t => !t.tiled);
+      this.tileFocus = null;
+      this.afterClose(wasActive, 0);
     },
     onRowDblClick(conn) {
       this.selectConn(conn);

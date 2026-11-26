@@ -483,6 +483,11 @@ body {
 }
 
 .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--color-surface);   /* header stays visible while the rows scroll */
+    box-shadow: 0 1px 0 var(--color-border);   /* collapsed borders scroll away: draw the line here */
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -717,10 +722,48 @@ body {
     overflow: hidden;
 }
 
+/* The home column. width:100% matters: it is a flex item with auto side margins, so
+   without it its width would follow the content (a wide table made the whole app wider).
+   The list card takes the remaining height, so switching tree/table moves nothing. */
 .home-content {
     flex: 1;
     min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
+    scrollbar-gutter: stable;   /* a scrollbar appearing must not shift the column */
+}
+
+.home-content > * {
+    flex-shrink: 0;
+}
+
+.home-content > .list-card {
+    flex: 1 1 auto;
+    flex-shrink: 1;
+    min-height: 14rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* tree and table are scrolled inside the card; only one is shown at a time */
+.connection-list {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Tree / Table: the active one is a primary button, the other a secondary one; same size */
+.btn-view {
+    min-width: 7rem;
+    justify-content: center;
+}
+
+/* same width whatever the label says (Select all / Deselect all, Expand / Collapse) */
+.btn-fixed {
+    min-width: 10rem;
+    justify-content: center;
 }
 
 .app-footer {
@@ -807,23 +850,139 @@ body {
     background-color: var(--color-hover-bg);
 }
 
+.term-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* The area is a grid: the 1px gap shows the divider between tiles. */
 .term-area {
     flex: 1;
     min-height: 0;
     position: relative;
+    display: grid;
+    gap: 1px;
+    background-color: #2a2d34;
+}
+
+.term-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
     background-color: #0f0f0f;
 }
 
 .term-pane {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
 }
 
 /* padding goes on .xterm itself: FitAddon subtracts it from the available size */
 .term-pane .xterm {
-    height: 100%;
+    position: absolute;
+    inset: 0;
     padding: 8px;
+}
+
+/* Header of a tile (only shown for terminals in the Tiles tab) */
+.term-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    padding: 0.2rem 0.5rem;
+    font-size: 12px;
+    color: #a7afba;
+    background-color: #181a1f;
+}
+
+.term-head .tab-close {
+    margin-left: auto;
+}
+
+/* The tile with the keyboard focus (when there is more than one) */
+.term-cell.focused::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--color-primary);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.term-cell.focused .term-head {
+    color: #f4f6f8;
+}
+
+/* Broadcast on: every tile is red, so it can't be missed */
+.term-area.broadcast .term-cell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid #e53e3e;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.term-area.broadcast .term-head {
+    background-color: #7b2323;
+    color: #fff;
+}
+
+/* Bar above the tiles: Broadcast input */
+.tiles-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+    padding: 0.25rem 0.75rem;
+    font-size: 12px;
+    color: var(--color-muted);
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tiles-bar.on {
+    color: #fff;
+    background-color: #c53030;
+    border-bottom-color: #c53030;
+}
+
+/* "Open in tiles": a button-looking label with a checkbox */
+.tiles-option {
+    cursor: pointer;
+    user-select: none;
+}
+
+.tiles-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.tiles-check input {
+    flex-shrink: 0;
+}
+
+.tab-count {
+    font-size: 11px;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background-color: var(--color-tag-bg);
+}
+
+.tab-rec {
+    color: #e53e3e;
+    font-size: 10px;
 }
 
 /* BULK SELECTION */
@@ -896,6 +1055,39 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+/* A second settings section is separated from the previous one */
+.settings-section + .settings-section {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+/* Destructive action: kept apart from the other data buttons */
+.settings-danger {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--color-border);
+}
+
+/* The settings panel scrolls on small windows */
+.modal-box-scroll {
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+/* Link-style button inside the empty list message */
+.empty-link {
+    display: block;
+    margin: 0.5rem auto 0;
+    background: transparent;
+    color: var(--color-primary);
+    text-decoration: underline;
+    cursor: pointer;
 }
 
 .settings-heading {

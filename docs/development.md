@@ -4,7 +4,7 @@
 
 ```txt
 /
-├── app.go                         # Core application logic, external terminal
+├── app.go                         # Core application logic (OpenSSH, the old external-terminal call, is no longer used by the UI)
 ├── terminal.go                    # Embedded terminal sessions (PTY + Wails events)
 ├── vault.go                       # Master-password vault (Argon2id + AES-256-GCM)
 ├── main.go                        # Entry point
@@ -72,6 +72,18 @@ xterm.js (tab)  --cols/rows--->  App.ResizeTerminal(id, c, r) --> pty.Setsize
   `ssh-agent` and password prompts work as in a normal terminal.
 - Output is base64 encoded so multi-byte UTF-8 characters are never split.
 - Terminal instances are kept in a plain JS `Map` (not in Alpine state).
+- **Tiles**: every session is a `tabs` entry with a `tiled` flag. Terminals opened while
+  *Open in tiles* is on (`openInTiles`, saved in `localStorage`) have `tiled: true` and are
+  shown together when the special `activeTab === 'tiles'` tab is selected, in a CSS grid
+  (`gridStyle`/`cellStyle`: 1, 2 side by side, 3 with a wide third, 2x2), max `TILES_MAX` (4).
+  The backend does not know about tiles: each terminal keeps its own id and PTY.
+- Every pane is observed by a shared `ResizeObserver` and refits itself, so adding or removing
+  a tile resizes the others (and their PTYs) without extra code. `tileFocus` is the tile that
+  has the keyboard focus.
+- **Broadcast** (`broadcast`, never persisted): in `term.onData`, input from a tile is also
+  written (`App.WriteTerminal`) to the other running tiles, but only if it came from the
+  keyboard or a paste (a 150 ms window opened by `keydown`/`paste`), so terminal replies,
+  focus reports and mouse reports are not echoed to the other terminals.
 - vendored xterm.js files come from the `@xterm/xterm` and `@xterm/addon-fit`
   npm packages (copy `lib/*.js` and `css/xterm.css` when upgrading).
 - The PTY layer is Linux/macOS only (no ConPTY on Windows).
