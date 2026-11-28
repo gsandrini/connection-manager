@@ -8,6 +8,9 @@ const PREF_KEYS = {
   fontSize: 'terminalFontSize',
   autoCopy: 'terminalCopyOnSelect',
   openInTiles: 'terminalOpenInTiles',
+  keepAlive: 'sshKeepAlive',
+  aliveInterval: 'sshServerAliveInterval',
+  aliveCountMax: 'sshServerAliveCountMax',
 };
 const THEME_COLORS = { light: '#f7f7f4', dark: '#181a1f' };
 
@@ -31,6 +34,32 @@ function loadFontSize() {
 // Copy-on-select is opt-in: off unless the user enabled it
 function loadAutoCopy() {
   try { return localStorage.getItem(PREF_KEYS.autoCopy) === '1'; } catch (_) { return false; }
+}
+
+// SSH keep-alive (ServerAliveInterval / ServerAliveCountMax): global preference,
+// read when a session starts. On by default, so idle sessions survive firewalls
+// and NATs that drop quiet TCP connections. The backend clamps to the same range.
+const KEEPALIVE = {
+  interval: { min: 1, max: 3600, def: 30 },   // seconds
+  countMax: { min: 1, max: 100, def: 3 },     // missed replies before ssh gives up
+};
+
+function clampInt(v, { min, max, def }) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return def;
+  return Math.min(max, Math.max(min, n));
+}
+
+function loadKeepAlive() {
+  try { return localStorage.getItem(PREF_KEYS.keepAlive) !== '0'; } catch (_) { return true; }
+}
+
+function loadAliveValue(key, range) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw !== null) return clampInt(raw, range);
+  } catch (_) { /* storage unavailable: use the default */ }
+  return range.def;
 }
 
 // Tiles: terminals opened with "Open in tiles" share one tab, laid out as a 2x2 grid
@@ -194,6 +223,12 @@ const TRANSLATIONS = {
     settingsReset: 'Ripristina',
     fontSmaller: 'Riduci il font',
     fontLarger: 'Aumenta il font',
+    settingsConnection: 'Parametri di connessione',
+    settingsKeepAlive: 'Keep-alive SSH',
+    settingsKeepAliveHint: 'Invia un pacchetto di controllo a intervalli regolari, così firewall e NAT non chiudono le sessioni inattive. Si applica ai nuovi terminali e ha la precedenza su ~/.ssh/config.',
+    settingsAliveInterval: 'ServerAliveInterval (secondi)',
+    settingsAliveCountMax: 'ServerAliveCountMax (tentativi)',
+    settingsKeepAliveSummary: 'La sessione viene chiusa dopo circa {total} s senza risposta dal server ({interval} s × {count}).',
   },
   en: {
     title: 'Connection Manager',
@@ -324,6 +359,12 @@ const TRANSLATIONS = {
     settingsReset: 'Reset',
     fontSmaller: 'Decrease font size',
     fontLarger: 'Increase font size',
+    settingsConnection: 'Connection parameters',
+    settingsKeepAlive: 'SSH keep-alive',
+    settingsKeepAliveHint: 'Sends a probe at regular intervals so firewalls and NATs do not drop idle sessions. Applies to new terminals and takes precedence over ~/.ssh/config.',
+    settingsAliveInterval: 'ServerAliveInterval (seconds)',
+    settingsAliveCountMax: 'ServerAliveCountMax (attempts)',
+    settingsKeepAliveSummary: 'The session is closed after about {total} s without a reply from the server ({interval} s × {count}).',
   },
 };
 
@@ -680,6 +721,10 @@ function ConnectionManagerApp() {
     fontMin: TERM_FONT.min,
     fontMax: TERM_FONT.max,
     fontDefault: TERM_FONT.def,
+    keepAlive: loadKeepAlive(),
+    aliveInterval: loadAliveValue(PREF_KEYS.aliveInterval, KEEPALIVE.interval),
+    aliveCountMax: loadAliveValue(PREF_KEYS.aliveCountMax, KEEPALIVE.countMax),
+    keepAliveRange: KEEPALIVE,
     get t() {
       return TRANSLATIONS[this.lang];
     },
@@ -722,6 +767,39 @@ function ConnectionManagerApp() {
     setOpenInTiles(on) {
       this.openInTiles = !!on;
       try { localStorage.setItem(PREF_KEYS.openInTiles, on ? '1' : '0'); } catch (_) {}
+    },
+    // SSH keep-alive: saved now, used by the sessions opened from now on
+    setKeepAlive(on) {
+      this.keepAlive = !!on;
+      try { localStorage.setItem(PREF_KEYS.keepAlive, on ? '1' : '0'); } catch (_) {}
+    },
+    setAliveInterval(v, input) {
+      const n = clampInt(v, KEEPALIVE.interval);
+      this.aliveInterval = n;
+      if (input) input.value = n;   // show the clamped value even if the state did not change
+      try { localStorage.setItem(PREF_KEYS.aliveInterval, String(n)); } catch (_) {}
+    },
+    setAliveCountMax(v, input) {
+      const n = clampInt(v, KEEPALIVE.countMax);
+      this.aliveCountMax = n;
+      if (input) input.value = n;
+      try { localStorage.setItem(PREF_KEYS.aliveCountMax, String(n)); } catch (_) {}
+    },
+    resetKeepAlive() {
+      this.setKeepAlive(true);
+      this.setAliveInterval(KEEPALIVE.interval.def);
+      this.setAliveCountMax(KEEPALIVE.countMax.def);
+    },
+    get keepAliveIsDefault() {
+      return this.keepAlive && this.aliveInterval === KEEPALIVE.interval.def
+        && this.aliveCountMax === KEEPALIVE.countMax.def;
+    },
+    // "…after about 90 s without a reply (30 s × 3)"
+    get keepAliveSummary() {
+      return this.t.settingsKeepAliveSummary
+        .replace('{total}', this.aliveInterval * this.aliveCountMax)
+        .replace('{interval}', this.aliveInterval)
+        .replace('{count}', this.aliveCountMax);
     },
     setBroadcast(on) {
       this.broadcast = !!on;
@@ -1513,7 +1591,8 @@ function ConnectionManagerApp() {
           await window.go.main.App.OpenLocalTerminal(id, term.cols, term.rows);
         } else {
           await window.go.main.App.OpenTerminal(
-            id, cur.username, cur.server, cur.port, term.cols, term.rows, cur.passwordEnc || '');
+            id, cur.username, cur.server, cur.port, term.cols, term.rows, cur.passwordEnc || '',
+            this.keepAlive ? this.aliveInterval : 0, this.aliveCountMax);
         }
         tab.status = 'running';
       } catch (err) {

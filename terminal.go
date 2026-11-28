@@ -56,6 +56,37 @@ func validSSHField(v string) bool {
 	return true
 }
 
+// Limits for the keep-alive options. The frontend clamps to the same range,
+// but the values are checked here too: they come from the UI (localStorage).
+const (
+	maxAliveInterval = 3600 // seconds
+	maxAliveCountMax = 100
+	defAliveCountMax = 3
+)
+
+// keepAliveArgs returns the ssh options for the keep-alive, or nil when it is
+// off (interval <= 0). Out-of-range values are clamped, never rejected, so a
+// bad preference can't stop a session from opening. Each option is a separate
+// argument (no shell involved), so there is nothing to escape.
+func keepAliveArgs(interval, countMax int) []string {
+	if interval <= 0 {
+		return nil
+	}
+	if interval > maxAliveInterval {
+		interval = maxAliveInterval
+	}
+	if countMax <= 0 {
+		countMax = defAliveCountMax
+	}
+	if countMax > maxAliveCountMax {
+		countMax = maxAliveCountMax
+	}
+	return []string{
+		"-o", "ServerAliveInterval=" + strconv.Itoa(interval),
+		"-o", "ServerAliveCountMax=" + strconv.Itoa(countMax),
+	}
+}
+
 // OpenTerminal starts `ssh user@server -p port` inside a PTY and streams its
 // output to the frontend through Wails events:
 //
@@ -65,7 +96,12 @@ func validSSHField(v string) bool {
 // passwordEnc is an optional vault blob. If the vault is unlocked, the
 // password is typed ONCE, only when ssh prints its own password prompt for
 // this very user@host. It never reaches the frontend.
-func (a *App) OpenTerminal(id, username, server string, port, cols, rows int, passwordEnc string) error {
+//
+// aliveInterval / aliveCountMax map to ssh's ServerAliveInterval and
+// ServerAliveCountMax (keep-alive). aliveInterval <= 0 means "keep-alive off":
+// no option is passed and ~/.ssh/config applies as usual. When it is on, the
+// options are passed with -o and take precedence over ~/.ssh/config.
+func (a *App) OpenTerminal(id, username, server string, port, cols, rows int, passwordEnc string, aliveInterval, aliveCountMax int) error {
 	if !validSSHField(id) || !validSSHField(username) || !validSSHField(server) {
 		return errInvalidTarget
 	}
@@ -91,7 +127,10 @@ func (a *App) OpenTerminal(id, username, server string, port, cols, rows int, pa
 	}
 	a.terms.mu.Unlock()
 
-	cmd := exec.Command(sshBin, "-p", strconv.Itoa(port), "--", fmt.Sprintf("%s@%s", username, server))
+	args := []string{"-p", strconv.Itoa(port)}
+	args = append(args, keepAliveArgs(aliveInterval, aliveCountMax)...)
+	args = append(args, "--", fmt.Sprintf("%s@%s", username, server))
+	cmd := exec.Command(sshBin, args...)
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color", "COLORTERM=truecolor")
 
 	return a.launch(id, cmd, cols, rows, func(s *termSession) {

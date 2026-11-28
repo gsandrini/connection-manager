@@ -720,6 +720,36 @@
           </span>
         </label>
       </section>
+      <!-- Section: connection parameters (SSH keep-alive). Read when a session starts. -->
+      <section class="settings-section">
+        <h3 class="settings-heading" x-text="t.settingsConnection"></h3>
+        <label class="settings-check" style="margin-top: 0; padding-top: 0; border-top: 0">
+          <input type="checkbox" :checked="keepAlive" @change="setKeepAlive($event.target.checked)" />
+          <span>
+            <span class="font-medium" x-text="t.settingsKeepAlive"></span>
+            <span class="settings-hint block" x-text="t.settingsKeepAliveHint"></span>
+          </span>
+        </label>
+        <div class="settings-row" :style="{ opacity: keepAlive ? 1 : 0.5 }">
+          <label for="alive-interval" class="font-medium" x-text="t.settingsAliveInterval"></label>
+          <input id="alive-interval" type="number" step="1" inputmode="numeric" class="field-input"
+            style="width: 5.5rem" :min="keepAliveRange.interval.min" :max="keepAliveRange.interval.max"
+            :value="aliveInterval" :disabled="!keepAlive"
+            @change="setAliveInterval($event.target.value, $event.target)" />
+        </div>
+        <div class="settings-row" :style="{ opacity: keepAlive ? 1 : 0.5 }">
+          <label for="alive-count" class="font-medium" x-text="t.settingsAliveCountMax"></label>
+          <input id="alive-count" type="number" step="1" inputmode="numeric" class="field-input"
+            style="width: 5.5rem" :min="keepAliveRange.countMax.min" :max="keepAliveRange.countMax.max"
+            :value="aliveCountMax" :disabled="!keepAlive"
+            @change="setAliveCountMax($event.target.value, $event.target)" />
+        </div>
+        <div class="flex items-start justify-between gap-3 mt-1">
+          <p class="settings-hint" x-show="keepAlive" x-text="keepAliveSummary"></p>
+          <button type="button" class="btn-secondary shrink-0" style="margin-left: auto" :disabled="keepAliveIsDefault"
+            @click="resetKeepAlive()" x-text="t.settingsReset"></button>
+        </div>
+      </section>
       <!-- Section: data. The panel closes first, so a file dialog or the confirmation is never stacked on it -->
       <section class="settings-section">
         <h3 class="settings-heading" x-text="t.settingsData"></h3>

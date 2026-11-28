@@ -70,6 +70,12 @@ xterm.js (tab)  --cols/rows--->  App.ResizeTerminal(id, c, r) --> pty.Setsize
   the same events, so input, resize, close and reconnect work identically.
 - `OpenTerminal` runs the system `ssh` inside a PTY, so `~/.ssh/config`, keys,
   `ssh-agent` and password prompts work as in a normal terminal.
+- **Keep-alive**: `OpenTerminal` takes two extra arguments, `aliveInterval` and
+  `aliveCountMax`. With `aliveInterval > 0` it adds `-o ServerAliveInterval=… -o
+  ServerAliveCountMax=…` (before the `--`); `<= 0` means off and nothing is passed.
+  `keepAliveArgs` clamps the values (1–3600 s, 1–100 tries) because they come from
+  `localStorage`. The three preferences (`sshKeepAlive`, `sshServerAliveInterval`,
+  `sshServerAliveCountMax`) are read by `startSession`, so they only affect new sessions.
 - Output is base64 encoded so multi-byte UTF-8 characters are never split.
 - Terminal instances are kept in a plain JS `Map` (not in Alpine state).
 - **Tiles**: every session is a `tabs` entry with a `tiled` flag. Terminals opened while

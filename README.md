@@ -31,6 +31,7 @@ Connection Manager keeps all SSH connections organized in one place. Browse them
 - Press Enter on an ended session to reconnect
 - Local shell in a tab: your own `$SHELL`, opened in your home directory ("Local" button, the `+` in the tab bar, or `Ctrl+Shift+T`)
 - Terminal font size (8–32 px) set from the Preferences panel (gear icon on the home page): global, applied instantly to every open tab and remembered across restarts
+- **SSH keep-alive** (Preferences > Connection parameters, on by default): sets `ServerAliveInterval` (default 30 s) and `ServerAliveCountMax` (default 3) so firewalls and NATs do not drop idle sessions. Global, remembered across restarts, applied to the sessions opened from then on; when on it takes precedence over `~/.ssh/config`, when off `ssh` behaves as usual
 - Optional copy-on-select (Preferences, off by default): the selected text is copied to the clipboard when you release the mouse button
 - **Tiles**: turn on the **Open in tiles** switch at the bottom right of the connection list and new terminals open side by side in a single **Tiles** tab (2x2 grid, up to 4 terminals) instead of one tab each. With it unticked (default) every terminal gets its own tab. The choice is remembered across restarts; when the grid is full a red message says so and nothing is opened
 - **Broadcast input** (Tiles tab): tick it to send what you type or paste in the focused tile to every tile. It always starts off, and while it is on the tiles and the bar turn red. A password typed by hand also goes to every terminal
